@@ -9,6 +9,7 @@
 #include "ssd1306.h"
 #include "median.h"
 #include "buttons.h"
+#include <avr/pgmspace.h>
 #include <util/delay.h>
 #include <stdio.h>
 #include <string.h>
@@ -59,6 +60,15 @@ volatile uint16_t METAScrollCnt = 0;
 uint8_t VolumeSliderBehaviour = 0;
 // uint8_t SleepVal[6] = {0, 1, 10, 15, 30, 60};
 // volatile uint16_t SleepChangeCnt = 0;
+
+// Константы для парсера
+__flash char CliListS[] = "#CLI.LIST#";
+__flash char CliListE[] = "##CLI.LIST#";
+__flash char CliListInfo[] = "LISTINFO#";
+__flash char AnswerNameSet[] = "NAMESET#: ";
+__flash char AnswerPLAYING[] = "PLAYING#";
+__flash char AnswerMETA[] = "META#: ";
+__flash char AnswerVOL[] = "VOL#: ";
 
 // Код и событие кнопки
 void get_but()
@@ -388,7 +398,7 @@ uint8_t set_volume(uint8_t val)
 			if (SensorState.ButPlay)
 			{
 				LCD_Goto(1, 5);
-				LCD_Printf("  Line potentiometr  ", 0, INV_OFF);
+				LCD_Printf("  Line potentiometer ", 0, INV_OFF);
 				_delay_ms(250);
 				VolumeSliderBehaviour = SliderLinePot;
 				wait_release_sensor();
@@ -408,7 +418,6 @@ uint8_t set_volume(uint8_t val)
 				SetVolumeCnt = 0;
 				val = check_val(--lVal);
 				changeInSlider = 1;
-				//show_volume(val, 1);
 			}
 			if (SensorState.ButNext)
 			{
@@ -442,7 +451,6 @@ uint8_t set_volume(uint8_t val)
 					wait_release_sensor();
 				}
 				changeInSlider = 1;	
-				//show_volume(val, 1);
 			}
 			#define DELTA		5
 			if (VolumeSliderBehaviour == SliderLinePot)
@@ -526,19 +534,22 @@ void karadio_parser(char* line)
 
 	if (Flag.GetListCountReading)
 	{
-		if (((ici = strstr(line, "#CLI.LIST#")) != NULL) && (!Flag.ListCountReadingInProc))
+		//if (((ici = strstr(line, "#CLI.LIST#")) != NULL) && (!Flag.ListCountReadingInProc))
+		if (((ici = strstr(line, pgm_read_byte(&CliListS))) != NULL) && (!Flag.ListCountReadingInProc))
 		{
 			Flag.ListCountReadingInProc = 1;
 			return;
 		}
 		if (Flag.ListCountReadingInProc)
 		{
-			if ((ici = strstr(line, "LISTINFO#")) != NULL)
+			//if ((ici = strstr(line, "LISTINFO#")) != NULL)
+			if ((ici = strstr(line, pgm_read_byte(&CliListInfo))) != NULL)
 			{
 				ListCount++;
 			}			
 		}
-		if (((ici = strstr(line, "##CLI.LIST#")) != NULL) && (Flag.ListCountReadingInProc))
+		//if (((ici = strstr(line, "##CLI.LIST#")) != NULL) && (Flag.ListCountReadingInProc))
+		if (((ici = strstr(line, pgm_read_byte(&CliListE))) != NULL) && (Flag.ListCountReadingInProc))
 		{
 			ListCount -= 1;
 			Flag.GetListCountReading = 0;
@@ -550,17 +561,20 @@ void karadio_parser(char* line)
 
 	if (Flag.ReadingNameSetFromListByIndex)
 	{
-		if (((ici = strstr(line, "#CLI.LIST#")) != NULL) && (!Flag.ReadingNameSetFromListByIndexProc))
+		//if (((ici = strstr(line, "#CLI.LIST#")) != NULL) && (!Flag.ReadingNameSetFromListByIndexProc))
+		if (((ici = strstr(line, pgm_read_byte(&CliListS))) != NULL) && (!Flag.ReadingNameSetFromListByIndexProc))
 		{
 			Flag.ReadingNameSetFromListByIndexProc = 1;
 			return;
 		}
-		if ((ici = strstr(line, "LISTINFO#")) != NULL)
+		//if ((ici = strstr(line, "LISTINFO#")) != NULL)
+		if ((ici = strstr(line, pgm_read_byte(&CliListInfo))) != NULL)
 		{
 			strlcpy(NameSet, ici + 16, strchr(ici, ',') - (ici + 15));
 			return;
 		}
-		if ((ici = strstr(line, "##CLI.LIST#")) != NULL)
+		//if ((ici = strstr(line, "##CLI.LIST#")) != NULL)
+		if ((ici = strstr(line, pgm_read_byte(&CliListE))) != NULL)
 		{
 			Flag.ReadingNameSetFromListByIndex = 0;
 			Flag.ReadingNameSetFromListByIndexComplete = 1;
@@ -569,7 +583,8 @@ void karadio_parser(char* line)
 		}
 	}
 
-	if ((ici=strstr(line, "NAMESET#: ")) != NULL)
+	//if ((ici=strstr(line, "NAMESET#: ")) != NULL)
+	if ((ici=strstr(line, pgm_read_byte(&AnswerNameSet))) != NULL)
 	{
 		clear_buffer(IntBuff, 4);
 		s = ici + 10;
@@ -580,17 +595,20 @@ void karadio_parser(char* line)
 		strcpy(NameSet, e + 1);
 		Flag.ReadingNameSet = 1;
 	}
-	if ((ici = strstr(line, "PLAYING#")) != NULL)
+	//if ((ici = strstr(line, "PLAYING#")) != NULL)
+	if ((ici = strstr(line, pgm_read_byte(&AnswerPLAYING))) != NULL)
 	{
 		Flag.RadioIsStarted = 1;
 	}
-	if ((ici = strstr(line, "META#: ")) != NULL)
+	//if ((ici = strstr(line, "META#: ")) != NULL)
+	if ((ici = strstr(line, pgm_read_byte(&AnswerMETA))) != NULL)
 	{
 		clear_buffer(METAMessage, META_SIZE);
 		strcpy(METAMessage, ici + 7);
 		Flag.METAInfo = 1;
 	}
-	if ((ici = strstr(line, "VOL#: ")) != NULL)
+	//if ((ici = strstr(line, "VOL#: ")) != NULL)
+	if ((ici = strstr(line, pgm_read_byte(&AnswerVOL))) != NULL)
 	{
 		if (!Flag.VolumeIsGetting)
 		{

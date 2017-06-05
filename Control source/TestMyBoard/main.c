@@ -8,20 +8,23 @@
 #include "bits_macros.h"
 #include "ssd1306.h"
 #include "median.h"
+#include "buttons.h"
 #include <util/delay.h>
 #include <stdio.h>
 #include <string.h>
+
+#define N_ELEMENTS(X) (sizeof(X)/sizeof(*(X)))
 
 /* == #defines ================================================================ */
 #define ON		1
 #define OFF		0
 #define DEF_MCU_CLOCK_PRESCALER		0u
 #define DEF_TIME_PERIOD_1MSEC       8u
-#define ACC_SIZE					3
+#define ACC_SIZE					6
 #define AccSizeMacro(val)			( 1 << val )
 #define SET_VOLUME_STOP				3000
 #define USART1_RX_BUFFER_SIZE		128
-#define USART1_TX_BUFFER_SIZE		64
+#define USART1_TX_BUFFER_SIZE		32
 #define KARADIO_STOP_BYTE			0x0D
 #define BAUD1						9600
 #define MYUBRR1						F_CPU/16/BAUD1-1
@@ -30,12 +33,16 @@
 
 /* == global variables ========================================================== */
 // Buffer for KaRadio exchange
+//#define RX_PACKET_INDEX_SIZE	2
 volatile uint8_t USART1RecieveCompleted = 0;
 volatile uint8_t USART1RxIndex = 0;
 volatile uint8_t USART1TxIndex = 0;
+volatile uint8_t RxPacketIndex = 0;
 volatile char RxPacket[USART1_RX_BUFFER_SIZE];
 volatile char USART1RxBuffer[USART1_RX_BUFFER_SIZE];
 volatile char USART1TxBuffer[USART1_TX_BUFFER_SIZE];
+volatile uint8_t 	ButtonCode = 0;
+volatile uint8_t 	ButtonEvent = 0;
 /****************************************************/
 
 char METAMessage[META_SIZE];
@@ -49,6 +56,26 @@ volatile uint16_t SetVolumeCnt = 0u;
 volatile uint16_t RefreshCurrentStationCnt = 0;
 uint16_t Buffer[AccSizeMacro(ACC_SIZE)];
 volatile uint16_t METAScrollCnt = 0;
+uint8_t VolumeSliderBehaviour = 0;
+// uint8_t SleepVal[6] = {0, 1, 10, 15, 30, 60};
+// volatile uint16_t SleepChangeCnt = 0;
+
+// ��� � ������� ������
+void get_but()
+{
+	ButtonCode = BUT_GetBut();
+	if ( ButtonCode )
+	{
+		ButtonEvent = BUT_GetBut();
+	}
+}
+
+enum VolSlBeh
+{	
+	SliderButtons,
+	SliderLinePot,
+	SliderZoomBut
+};
 
 struct SensorState
 {
@@ -112,7 +139,6 @@ static int8_t vcc_enable(uint8_t val);
 static void ports_init(void);
 
 void send_to_karadio(char* text);
-
 
 /* == file-scope (static) functions defines =================================== */
 
@@ -198,7 +224,6 @@ uint16_t str2int(char* data)
 	return val;
 }
 
-//volatile uint16_t UTFCharCode;
 void utf_to_cp1251(char* dest, char* src)
 {
 	char* pSrc = src;
@@ -303,6 +328,9 @@ void wait_release_sensor()
 			SensorState.ButPlay = GET_SELFCAP_SENSOR_STATE(ButPlay);
 			SensorState.ButNext = GET_SELFCAP_SENSOR_STATE(ButNext);
 			SensorState.Slider = GET_SELFCAP_SENSOR_STATE(Slider);
+
+			GET_SELFCAP_ROTOR_SLIDER_POSITION(0);
+
 			if (!SensorState.ButPrev && 
 				!SensorState.ButStop &&
 				!SensorState.ButPlay &&
@@ -315,14 +343,23 @@ void wait_release_sensor()
 	}
 }
 
-void show_volume(uint8_t val)
+void show_volume(uint8_t val, uint8_t with_big_num)
 {
-	//char Text[4];
-	//sprintf(Text, "%3d", val);
-	//LCD_Goto(24, 0);
-	//LCD_Goto(1, 5);
-	//LCD_Printf(Text, 0, INV_OFF);
+	char Text[4];
+	if (with_big_num)
+	{
+		sprintf(Text, "%3d", val);
+		LCD_Goto(24, 0);
+		LCD_Printf(Text, 2, INV_OFF);
+	}
 	LCD_Volume(val / 2);
+}
+
+uint8_t check_val(int val)
+{
+	if (val < 0) return 0;
+	else if (val > 255) return 255;
+	else return (uint8_t)val;
 }
 
 uint8_t set_volume(uint8_t val)
@@ -330,13 +367,10 @@ uint8_t set_volume(uint8_t val)
 	char Text[16];
 	uint8_t changeInSlider = 0;
 	uint8_t slVal = 0;
-	#define DELTA	0
+	int lVal = val;
 	LCD_Clear();
-	//sprintf(Text, "%3d", val);
-	//LCD_Goto(24, 0);
-	//LCD_Printf(Text, 2, INV_OFF);
-	show_volume(0);
-	show_volume(val);
+	show_volume(0, 1);
+	show_volume(val, 1);
 
 	wait_release_sensor();
 	
@@ -353,86 +387,83 @@ uint8_t set_volume(uint8_t val)
 
 			if (SensorState.ButPlay)
 			{
+				LCD_Goto(1, 5);
+				LCD_Printf("  Line potentiometr  ", 0, INV_OFF);
+				_delay_ms(250);
+				VolumeSliderBehaviour = SliderLinePot;
 				wait_release_sensor();
-				send_to_karadio("cli.list");
 			}
 			if (SensorState.ButStop)
-			{
-				wait_release_sensor();
+			{				
 				LCD_Goto(1, 5);
-				LCD_Printf("   а飥𪡋湠!!!   ", 0, OFF);
-				_delay_ms(1000);
-				//send_to_karadio("cli.list");
+				LCD_Printf("       Buttons       ", 0, INV_OFF);
+				_delay_ms(250);
+				VolumeSliderBehaviour = SliderButtons;
+				wait_release_sensor();
 			}
 
 			if (SensorState.ButPrev)
 			{
-				// wait_release_sensor();
+				wait_release_sensor();
 				SetVolumeCnt = 0;
-				_delay_ms(35);
-				if (val != 0) val--;
+				val = check_val(--lVal);
 				changeInSlider = 1;
-				show_volume(val);
+				//show_volume(val, 1);
 			}
 			if (SensorState.ButNext)
 			{
-				// wait_release_sensor();
+				wait_release_sensor();
 				SetVolumeCnt = 0;
-				_delay_ms(35);
-				if (val < 255) val++;
+				val = check_val(++lVal);
 				changeInSlider = 1;
-				show_volume(val);
+				//show_volume(val, 1);
 			}
 		}
-		
+	
 		if (SensorState.Slider)
 		{
 			SetVolumeCnt = 0;
 			// slVal = GET_SELFCAP_ROTOR_SLIDER_POSITION(0);
 			// slVal = MedianFilter(GET_SELFCAP_ROTOR_SLIDER_POSITION(0));
-			slVal = float_window(MedianFilter(GET_SELFCAP_ROTOR_SLIDER_POSITION(0)));	
-			if ((slVal > 102) && (slVal < 153))
+			// slVal = float_window(MedianFilter(GET_SELFCAP_ROTOR_SLIDER_POSITION(0)));
+			if (VolumeSliderBehaviour == SliderButtons)
 			{
-				LCD_Goto(1, 5);
-				LCD_Printf("         <|>         ", 0, OFF);
-			} else if ((slVal > 51) && (slVal < 93))
-			{
-				_delay_ms(30);
-				LCD_Goto(1, 5);
-				LCD_Printf("      < < |          ", 0, OFF);
-				if (val != 0) val--;
-			} else if ((slVal > 0) && (slVal < 51))
-			{
-				_delay_ms(10);
-				LCD_Goto(1, 5);
-				LCD_Printf("  < < < < |          ", 0, OFF);
-				if (val != 0) val--;
-			} else if ((slVal > 162) && (slVal < 204))
-			{
-				_delay_ms(30);
-				LCD_Goto(1, 5);
-				LCD_Printf("          | > >      ", 0, OFF);
-				if (val < 255) val++;
-			} else if ((slVal > 204) && (slVal < 255))
-			{
-				_delay_ms(10);
-				LCD_Goto(1, 5);
-				LCD_Printf("          | > > > >  ", 0, OFF);
-				if (val < 255) val++;
+				slVal = GET_SELFCAP_ROTOR_SLIDER_POSITION(0);
+				if (slVal < 60)
+				{
+					lVal -= 5;
+					val = lVal = check_val(lVal);
+					wait_release_sensor();
+				}
+				if (slVal > 195)
+				{
+					lVal += 5;
+					val = lVal = check_val(lVal);
+					wait_release_sensor();
+				}
+				changeInSlider = 1;	
+				//show_volume(val, 1);
 			}
-			show_volume(val);
-			changeInSlider = 1;
-
-			/*if ((slVal < (val - DELTA)) || (slVal > (val + DELTA)))
+			#define DELTA		5
+			if (VolumeSliderBehaviour == SliderLinePot)
 			{
-				val = slVal;
-				show_volume(val);
-				changeInSlider = 1;
-			}*/		
+				slVal = float_window(MedianFilter(GET_SELFCAP_ROTOR_SLIDER_POSITION(0)));
+				if ((slVal < (lVal - DELTA)) || (slVal > (lVal + DELTA)))
+				{
+					val = lVal = slVal;
+					changeInSlider = 1;	
+					show_volume(val, 0);
+				}				
+			}								
+		}
+		else if (changeInSlider == 1)
+		{
+			show_volume(val, 1);
 		}
 
 		if (changeInSlider == 1)
 		{
+			show_volume(val, 1);
 			sprintf(Text, "cli.vol(\"%d\")", val);
 			send_to_karadio(Text);
 			changeInSlider = 0;
@@ -453,7 +484,6 @@ void send_to_karadio(char* text)
 	UDR1 = USART1TxBuffer[0];
 }
 
-/* ¥䴹ὠ򳱮랠************************************************************/
 #define SCROLL_TEXT_LEN		22
 char TitleString[META_SIZE + SCROLL_TEXT_LEN];
 uint16_t ScrollIndex = 0;
@@ -484,7 +514,6 @@ void draw_line(uint8_t page)
 		LCD_Commmand(DATA, 0x18);
 	}
 }
-/************************************************************ ¥䴹ὠ򳱮랠*/
 
 void karadio_parser(char* line)
 {
@@ -535,6 +564,7 @@ void karadio_parser(char* line)
 		{
 			Flag.ReadingNameSetFromListByIndex = 0;
 			Flag.ReadingNameSetFromListByIndexComplete = 1;
+			Flag.ReadingNameSetFromListByIndexProc = 0;
 			return;
 		}
 	}
@@ -571,13 +601,25 @@ void karadio_parser(char* line)
 	}
 }
 
+void show_status_string(char* text, uint8_t inv)
+{
+	LCD_Goto(1, StatusRow);
+	LCD_Printf(text, 0, inv);
+}
+
 int main(void)
 {
 	int8_t Temp = 0;
 	char Text[100];
+
+	/* Button init */
+	BUT_Init();
+
 	/* OLED display init */
 	LCD_init();
-	LCD_DrawImage(0);
+	#if IMAGE_INCLUDE
+		LCD_DrawImage(0);
+	#endif
 		
 	/* GPIO ports init */
 	ports_init();	
@@ -601,7 +643,7 @@ int main(void)
 	USART1_Init(MYUBRR1);
 	
 	/* Configure the CS8406 */
-	_delay_ms(2000);	
+	_delay_ms(500);	
 	CS8406_Init();
 	LCD_Clear();
 
@@ -612,15 +654,19 @@ int main(void)
 	Flag.ListCountReading = 0;
     while(1)
     {
+		get_but();
+
+		if ( ( ButtonCode == BUT_1_ID ) && ( ButtonEvent == BUT_RELEASED_CODE ) )
+		{
+			LCD_Clear();
+		}
+
 		/* USART1 Rx *****************************************************************************/
 		if (USART1RecieveCompleted == 1)
 		{
 			karadio_parser(RxPacket);
 			clear_buffer(RxPacket, USART1_RX_BUFFER_SIZE);
 			USART1RecieveCompleted = 0;		
-			//sprintf(Text, "List index: %3d/%d ", Temp + 1, ListCount);
-			//LCD_Goto(1, StatusRow);
-			//LCD_Printf(Text, 0, INV_OFF);	
 		}
 		/*****************************************************************************************/
 
@@ -634,15 +680,13 @@ int main(void)
 		if (Flag.ListCountReadingComplete)
 		{
 			sprintf(Text, "List index: %3d/%d ", Temp + 1, ListCount);
-			LCD_Goto(1, StatusRow);
-			LCD_Printf(Text, 0, INV_OFF);
+			show_status_string(Text, INV_OFF);
 			Flag.ListCountReadingComplete = 0;
 		}
 
 		if (Flag.RefreshInfo)
 		{
 			send_to_karadio("cli.info");
-			Temp = CurrentListIndex;
 			Flag.RefreshInfo = 0;
 		}
 
@@ -680,9 +724,9 @@ int main(void)
 			Flag.ReadingNameSetFromListByIndexComplete = 0;
 		}
 
-		if (!Flag.ListCountReadingInProc)
+		if ((!Flag.ListCountReadingInProc) && (!Flag.ReadingNameSetFromListByIndexProc) && (!RefreshCurrentStationCnt))
 		{
-			/* û㯤 衣אַ㫠 **************************************************************************/
+			/* META info ***********************************************************************/
 			if (Flag.METAInfo == 1)
 			{
 				for(int i = 0; i < 100; i++) Text[i] = 0;
@@ -690,14 +734,14 @@ int main(void)
 				set_title_string(Text);
 				Flag.METAInfo = 0;
 			}
-			/************************************************************************** û㯤 衣אַ㫠 */
-			/* Ҫ񯬫鮣 衣אַ㫠 **********************************************************************/
+			/*********************************************************************** META info */
+			/* Scroll **************************************************************************/
 			if(Flag.Scroll)
 			{
 				scroll_title_string();
 				Flag.Scroll = 0;
 			}
-			/********************************************************************** Ҫ񯬫鮣 衣אַ㫠 */	
+			/************************************************************************** Scroll */	
 		}
 
         touch_sensors_measure();
@@ -718,20 +762,18 @@ int main(void)
 			}
 			if (SensorState.ButPrev)
 			{
-			wait_release_sensor();
+				wait_release_sensor();
 				if (--Temp < 0)
 				{
 					Temp = ListCount - 1;
 				}
 				sprintf(Text, "List index: %3d/%d ", Temp + 1, ListCount);
-				LCD_Goto(1, StatusRow);
-				LCD_Printf(Text, 0, INV_OFF);
+				show_status_string(Text, INV_OFF);
 				Flag.ReadingNameSetFromListByIndex = 1;
 				_delay_ms(10);
 				sprintf(Text, "cli.list(\"%d\")\n", Temp);
 				send_to_karadio(Text);
-				RefreshCurrentStationCnt = REFRESH_TIMOUT;
-				// send_to_karadio("cli.prev");				
+				RefreshCurrentStationCnt = REFRESH_TIMOUT;			
 			}
 			if (SensorState.ButStop)
 			{
@@ -746,7 +788,6 @@ int main(void)
 				sprintf(Text, "cli.play(\"%d\")", Temp);
 				send_to_karadio(Text);
 				RefreshCurrentStationCnt = 0;
-				//send_to_karadio("cli.start");
 			}
 			if (SensorState.ButNext)
 			{
@@ -756,14 +797,12 @@ int main(void)
 					Temp = 0;
 				}				
 				sprintf(Text, "List index: %3d/%d ", Temp + 1, ListCount);
-				LCD_Goto(1, StatusRow);
-				LCD_Printf(Text, 0, INV_OFF);				
+				show_status_string(Text, INV_OFF);			
 				Flag.ReadingNameSetFromListByIndex = 1;
 				_delay_ms(10);
 				sprintf(Text, "cli.list(\"%d\")\n", Temp);
 				send_to_karadio(Text);
 				RefreshCurrentStationCnt = REFRESH_TIMOUT;
-				// send_to_karadio("cli.next");
 			}
 		}
     }
@@ -808,6 +847,8 @@ ISR(TIMER2_COMPA_vect)
     /* Clear the timer flag */
     TIFR2 |= OCF2A;
 	static uint16_t ScrollDevCnt = 0;
+
+	BUT_Poll();
 
 	if(RefreshCurrentStationCnt > 0)
 	{

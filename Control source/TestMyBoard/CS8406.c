@@ -6,27 +6,27 @@
  */
 
 #include "CS8406.h"
-#include "i2c-soft.h"
+#include "TWI_SW_Master.h"
 
 void CS8406_Init()
 {
-	i2c_Init();
+	TWI_SW_Init();
 
-	i2c_Start();
-	i2c_Write(WRITE_ADDR_CS8406);
-	i2c_Write(REG_ADDR_ID_VERSION);
-	i2c_Start();
-	i2c_Write(READ_ADDR_CS8406);
-	i2c_Read(0);
-	i2c_Stop();
+	TWI_SW_Start();
+	TWI_SW_Write(WRITE_ADDR_CS8406);
+	TWI_SW_Write(REG_ADDR_ID_VERSION);
+	TWI_SW_Start();
+	TWI_SW_Write(READ_ADDR_CS8406);
+	TWI_SW_Read(0);
+	TWI_SW_Stop();
 
 	CS8406_Registers.CLK_SOURCE_CTRL.RUN = 1;
 	CS8406_Registers.CLK_SOURCE_CTRL.CLK = 3;
-	i2c_Start();
-	i2c_Write(WRITE_ADDR_CS8406);
-	i2c_Write(REG_ADDR_CLOCK_SOURCE_CTRL);
-	i2c_Write(CS8406_Registers.REG_04);
-	i2c_Stop();
+	TWI_SW_Start();
+	TWI_SW_Write(WRITE_ADDR_CS8406);
+	TWI_SW_Write(REG_ADDR_CLOCK_SOURCE_CTRL);
+	TWI_SW_Write(CS8406_Registers.REG_04);
+	TWI_SW_Stop();
 
 	CS8406_Registers.SER_IN_Format.SIMS = 0;
 	CS8406_Registers.SER_IN_Format.SISF = 0;
@@ -36,10 +36,10 @@ void CS8406_Init()
 	CS8406_Registers.SER_IN_Format.SISPOL = 0;
 	CS8406_Registers.SER_IN_Format.SILRPOL = 0;
 
-	i2c_Start();
-	i2c_Write(WRITE_ADDR_CS8406);
-	i2c_Write(REG_ADDR_SERIAL_INPUT_FMRM);
-	i2c_Write(CS8406_Registers.REG_05);
-	i2c_Stop();
+	TWI_SW_Start();
+	TWI_SW_Write(WRITE_ADDR_CS8406);
+	TWI_SW_Write(REG_ADDR_SERIAL_INPUT_FMRM);
+	TWI_SW_Write(CS8406_Registers.REG_05);
+	TWI_SW_Stop();
 }
 

@@ -7,13 +7,14 @@ OLED LCD SSD1306 дисплея.
 
 #include <util/delay.h>
 #include "ssd1306.h"
-#include "i2c-soft.h"
+#include "TWI_SW_Master.h"
 
 unsigned char LCD_X, LCD_Y, LCD_INVERSION;
 
 unsigned char GlobalTemp = 0;
 unsigned char GlobalChar = 0;
 
+#if IMAGE_INCLUDE
 FLASH_VAR(unsigned char image0[]) =
 {	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -142,7 +143,8 @@ FLASH_VAR(unsigned char image0[]) =
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+#endif
 
 FLASH_VAR(unsigned char LCD_Buffer[]) =
 //unsigned char LCD_Buffer[] =
@@ -503,7 +505,7 @@ FLASH_VAR(unsigned char BigNum[15][96]) =
 
 void LCD_init(void)
 {
-	i2c_Init();
+	TWI_SW_Init();
 
 	LCD_Sleep(0);
 	_delay_ms(10);
@@ -575,11 +577,11 @@ void LCD_Sleep(char set)
 
 void LCD_Commmand(unsigned char ControByte, unsigned char DataByte)
 {
-	i2c_Start();
-	i2c_Write(SSD1306_I2C_ADDRESS);
-	i2c_Write(ControByte);
-	i2c_Write(DataByte);
-	i2c_Stop();
+	TWI_SW_Start();
+	TWI_SW_Write(SSD1306_ADDRESS);
+	TWI_SW_Write(ControByte);
+	TWI_SW_Write(DataByte);
+	TWI_SW_Stop();
 }
 
 void LCD_Goto(unsigned char x, unsigned char y)
@@ -630,24 +632,24 @@ void LCD_Char(unsigned int c)
 {
 	unsigned char x = 0;
 	GlobalTemp = c;
-	i2c_Start();
-	i2c_Write(SSD1306_I2C_ADDRESS);
-	i2c_Write(DATA);//data mode
+	TWI_SW_Start();
+	TWI_SW_Write(SSD1306_ADDRESS);
+	TWI_SW_Write(DATA);//data mode
 	for (x = 0; x < 5; x++) {
-		//i2c_Write(read_byte_flash(LCD_Buffer[c * 5 + x]));
+		//TWI_SW_Write(read_byte_flash(LCD_Buffer[c * 5 + x]));
 		if (LCD_INVERSION)
 		{
-			i2c_Write(~read_byte_flash(LCD_Buffer[c * 5 + x]));
+			TWI_SW_Write(~read_byte_flash(LCD_Buffer[c * 5 + x]));
 		}
 		else
 		{
-			i2c_Write(read_byte_flash(LCD_Buffer[c * 5 + x]));
+			TWI_SW_Write(read_byte_flash(LCD_Buffer[c * 5 + x]));
 		}
 	}
-	if (LCD_INVERSION) i2c_Write(0xFF);
-	else i2c_Write(0x00);
-	//i2c_Write(0x00);  //пробел в одну точку между символами
-	i2c_Stop();    // stop transmitting
+	if (LCD_INVERSION) TWI_SW_Write(0xFF);
+	else TWI_SW_Write(0x00);
+	//TWI_SW_Write(0x00);  //пробел в одну точку между символами
+	TWI_SW_Stop();    // stop transmitting
 
 	LCD_X += SSD1306_DEFAULT_SPACE;//8;
 	if(LCD_X > SSD1306_LCDWIDTH) {
@@ -670,25 +672,25 @@ void LCD_BigNum(unsigned char num)
 		if(num == 67) { num = 13; }  //градусы
 	}
 
-  i2c_Start();
-  i2c_Write(SSD1306_I2C_ADDRESS);
-  i2c_Write(DATA);//data mode
+  TWI_SW_Start();
+  TWI_SW_Write(SSD1306_ADDRESS);
+  TWI_SW_Write(DATA);//data mode
   for (x = 0; x < 96; x++)
 	{
-	  i2c_Write(read_byte_flash(BigNum[num][x]));
+	  TWI_SW_Write(read_byte_flash(BigNum[num][x]));
      if(z>=23)
      {
-    	 i2c_Stop();    // stop transmitting
+    	 TWI_SW_Stop();    // stop transmitting
        LCD_Goto(LCD_X,LCD_Y+1);
 
        z=0;
-       i2c_Start();
-       i2c_Write(SSD1306_I2C_ADDRESS);
-       i2c_Write(DATA);//data mode
+       TWI_SW_Start();
+       TWI_SW_Write(SSD1306_ADDRESS);
+       TWI_SW_Write(DATA);//data mode
      }else{z++;}
 
      }
-  i2c_Stop();    // stop transmitting
+  TWI_SW_Stop();    // stop transmitting
 
 	LCD_X += 23;
     LCD_Goto(LCD_X,y_s);
@@ -703,16 +705,16 @@ void LCD_CharBig(unsigned int c)
 	unsigned char x = 0;
 	unsigned int m = 0;
 
-	i2c_Start();
-	i2c_Write(SSD1306_I2C_ADDRESS);
-	i2c_Write(DATA);					//data mode
+	TWI_SW_Start();
+	TWI_SW_Write(SSD1306_ADDRESS);
+	TWI_SW_Write(DATA);					//data mode
 	for (x = 0; x < 5; x++) {
 		m = read_byte_flash(LCD_Buffer[c * 5 + x]);
-		i2c_Write(m);
-		i2c_Write(m);
+		TWI_SW_Write(m);
+		TWI_SW_Write(m);
 	}
-	i2c_Write(0x00);  	//пробел в одну точку между символами
-	i2c_Stop();    	// stop transmitting
+	TWI_SW_Write(0x00);  	//пробел в одну точку между символами
+	TWI_SW_Stop();    	// stop transmitting
 	LCD_X += 11;
 	if(LCD_X > SSD1306_LCDWIDTH) {
 		LCD_X = SSD1306_DEFAULT_SPACE;
@@ -742,6 +744,7 @@ void LCD_Printf(char* buf, unsigned char size, unsigned char inversion) //выводи
 	}
 }
 
+#if IMAGE_INCLUDE
 void LCD_DrawImage(unsigned char num_image)
 {
 	unsigned int i;
@@ -762,6 +765,8 @@ void LCD_DrawImage(unsigned char num_image)
 		}
 	}
 }
+#endif
+
 
 void LCD_Volume(unsigned char val)
 {
@@ -774,8 +779,8 @@ void LCD_Volume(unsigned char val)
 		//Step = val - lastValue;
 		for (int i = lastValue; i < val; i++)
 		{
-			LCD_Goto(i, 6);
-			LCD_Commmand(DATA, 0xFF);
+			//LCD_Goto(i, 6);
+			//LCD_Commmand(DATA, 0xFF);
 			LCD_Goto(i, 7);
 			LCD_Commmand(DATA, 0xFF);
 		}
@@ -785,8 +790,8 @@ void LCD_Volume(unsigned char val)
 		//Step = lastValue - val;
 		for (int i = lastValue; i > val; i--)
 		{
-			LCD_Goto(i, 6);
-			LCD_Commmand(DATA, 0x00);
+			//LCD_Goto(i, 6);
+			//LCD_Commmand(DATA, 0x00);
 			LCD_Goto(i, 7);
 			LCD_Commmand(DATA, 0x00);
 		}

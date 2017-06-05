@@ -5,17 +5,17 @@
  *      Author: Pavel V. Gololobov
  */
 #include <avr/io.h>
-#include "i2c-soft.h"
+#include "TWI_SW_Master.h"
 
 //------------------------------------------------------------------
 // I2C Speed Down
 //------------------------------------------------------------------
-#define I2CWAIT i2c_Wait(1);
+#define I2CWAIT TWI_SW_Wait(1);
 
 //------------------------------------------------------------------
 // I2C Delay
 //------------------------------------------------------------------
-void i2c_Wait(unsigned int n)
+void TWI_SW_Wait(unsigned int n)
 {
 	do
 	{
@@ -56,7 +56,7 @@ static void SetHighSCL()
 //------------------------------------------------------------------
 // I2C Initialize Bus
 //------------------------------------------------------------------
-void i2c_Init()
+void TWI_SW_Init()
 {
 	I2CSEL &= ~SDA;
 	I2CSEL &= ~SCL;
@@ -75,7 +75,7 @@ void i2c_Init()
 //------------------------------------------------------------------
 // I2C Start Data Transfer
 //------------------------------------------------------------------
-void i2c_Start()
+void TWI_SW_Start()
 {
 	SetHighSCL();
 	SetHighSDA();
@@ -90,7 +90,7 @@ void i2c_Start()
 //------------------------------------------------------------------
 // I2C Stop  Transfer
 //------------------------------------------------------------------
-void i2c_Stop()
+void TWI_SW_Stop()
 {
 	SetLowSCL();
 	SetLowSDA();
@@ -105,7 +105,7 @@ void i2c_Stop()
 //------------------------------------------------------------------
 // I2C Write  Transfer
 //------------------------------------------------------------------
-unsigned int i2c_Write(unsigned int a)
+unsigned int TWI_SW_Write(unsigned int a)
 {
 	unsigned int i;
 	unsigned int return_ack;
@@ -128,9 +128,9 @@ unsigned int i2c_Write(unsigned int a)
 	SetHighSCL();
 
 	if (I2CIN & SDA)
-		return_ack = NO_I2C_ACK;
+		return_ack = NO_TWI_SW_ACK;
 	else
-		return_ack = OK_I2C_ACK;
+		return_ack = OK_TWI_SW_ACK;
 	
     SetLowSCL();
 
@@ -140,7 +140,7 @@ unsigned int i2c_Write(unsigned int a)
 //------------------------------------------------------------------
 // I2C Read  Transfer
 //------------------------------------------------------------------
-unsigned int i2c_Read(unsigned int ack)
+unsigned int TWI_SW_Read(unsigned int ack)
 {
 	unsigned int i;
 	unsigned int caracter = 0x00;
@@ -171,15 +171,15 @@ unsigned int i2c_Read(unsigned int ack)
 //------------------------------------------------------------------
 // I2C Read Byte
 //------------------------------------------------------------------
-unsigned int i2c_ReadByte(unsigned int nAddress, unsigned int nRegister)
+unsigned int TWI_SW_ReadByte(unsigned int nAddress, unsigned int nRegister)
 {
-	i2c_Start();
-	i2c_Write(nAddress);
-	i2c_Write(nRegister);
-	i2c_Start();
-	i2c_Write(nAddress | 0x01);
-	uint8_t ret = i2c_Read(0);
-	i2c_Stop();
+	TWI_SW_Start();
+	TWI_SW_Write(nAddress);
+	TWI_SW_Write(nRegister);
+	TWI_SW_Start();
+	TWI_SW_Write(nAddress | 0x01);
+	uint8_t ret = TWI_SW_Read(0);
+	TWI_SW_Stop();
 
 	return ret;
 }
@@ -187,12 +187,12 @@ unsigned int i2c_ReadByte(unsigned int nAddress, unsigned int nRegister)
 //------------------------------------------------------------------
 // I2C Write Byte
 //------------------------------------------------------------------
-void i2c_WriteByte(unsigned int nAddress, unsigned int nRegister, unsigned int nValue)
+void TWI_SW_WriteByte(unsigned int nAddress, unsigned int nRegister, unsigned int nValue)
 {
-	i2c_Start();
-	i2c_Write(nAddress);
-	i2c_Write(nRegister);
-	i2c_Write(nValue);
-	i2c_Stop();
+	TWI_SW_Start();
+	TWI_SW_Write(nAddress);
+	TWI_SW_Write(nRegister);
+	TWI_SW_Write(nValue);
+	TWI_SW_Stop();
 }
 

@@ -10,8 +10,8 @@
 
 #include "compilers_4.h"
 
-#define SSD1306_I2C_ADDRESS					0x78 //0x3C// 0x3D//0x78
-
+#define SSD1306_ADDRESS					0x78 //0x3C// 0x3D//0x78
+#define IMAGE_INCLUDE	1
 
 // size
 #define SSD1306_LCDWIDTH                 	128
@@ -71,11 +71,15 @@ void LCD_Goto(unsigned char x, unsigned char y);    //э▓Лэ│аюпвщ│╝ ыпоёейнс│╗
 void LCD_Goto2X(unsigned char x, unsigned char y); //э▓Лэ│аюпвщ│╝ ыпоёейнс│╗ э▒╢э╛очжнубнэЮ╣э╛▓
 void LCD_Clear(void);  //я╕иЄ│ла у▓ефмахй▒ЁРме
 void LCD_Contrast(char set_contrast); //юб▒є▒пйыЮаыпнє▒б▒єЮбоЁЮоахма255
-void LCD_BigNum(unsigned char num);  //у╝вяватплщ│аэ╜зэ╡░
 void LCD_Char(unsigned int c);  //у╝вяваЄйнвяма
+void LCD_BigNum(unsigned char num);  //у╝вяватплщ│аэ╜зэ╡░
 void LCD_CharBig(unsigned int c); // у╝вяваы▒│ЁРо╗єб▓иьпв
 void LCD_Printf(char* buf, unsigned char size, unsigned char inversion);
-void LCD_DrawImage(unsigned char num_image); //у╝вяеиЁблаё│йны▒ащеаэ╡▓э╢╕
+
+#if IMAGE_INCLUDE
+	void LCD_DrawImage(unsigned char num_image); //у╝вяеиЁблаё│йны▒ащеаэ╡▓э╢╕
+#endif
+
 void LCD_Bat(unsigned char y,unsigned char x, unsigned char z);   //ёй▓│ц░атб▓с▒еъл│ ЁРмаыпоёейнс│аъЯ║ - я░а0 хма10 хжлцоичЛКvoid LCD_Mode(char set_mode); //1 - inverted / 0 - normal
 void LCD_Sleep(char set);   //1 - on sleep / 0 - off sleep
 void LCD_Mode(unsigned char set_mode);

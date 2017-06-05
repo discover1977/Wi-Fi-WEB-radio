@@ -628,6 +628,15 @@ void LCD_Clear(void)
 	LCD_Y = 0;
 }
 
+void LCD_PageClear(uint8_t page)
+{
+	for (uint8_t i = 0; i < 128; i++)
+	{
+		LCD_Goto(i, page);
+		LCD_Commmand(DATA, 0x00);	
+	}
+}
+
 void LCD_Char(unsigned int c)
 {
 	unsigned char x = 0;
@@ -766,7 +775,6 @@ void LCD_DrawImage(unsigned char num_image)
 	}
 }
 #endif
-
 
 void LCD_Volume(unsigned char val)
 {

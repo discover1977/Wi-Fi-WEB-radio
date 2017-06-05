@@ -70,6 +70,7 @@ void LCD_Commmand(unsigned char ControByte, unsigned char DataByte); //ыпмсод хй
 void LCD_Goto(unsigned char x, unsigned char y);    //э▓Лэ│аюпвщ│╝ ыпоёейнс│╗
 void LCD_Goto2X(unsigned char x, unsigned char y); //э▓Лэ│аюпвщ│╝ ыпоёейнс│╗ э▒╢э╛очжнубнэЮ╣э╛▓
 void LCD_Clear(void);  //я╕иЄ│ла у▓ефмахй▒ЁРме
+void LCD_PageClear(uint8_t page);
 void LCD_Contrast(char set_contrast); //юб▒є▒пйыЮаыпнє▒б▒єЮбоЁЮоахма255
 void LCD_Char(unsigned int c);  //у╝вяваЄйнвяма
 void LCD_BigNum(unsigned char num);  //у╝вяватплщ│аэ╜зэ╡░

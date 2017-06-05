@@ -34,7 +34,6 @@
 
 /* == global variables ========================================================== */
 // Buffer for KaRadio exchange
-//#define RX_PACKET_INDEX_SIZE	2
 volatile uint8_t USART1RecieveCompleted = 0;
 volatile uint8_t USART1RxIndex = 0;
 volatile uint8_t USART1TxIndex = 0;
@@ -62,13 +61,14 @@ uint8_t VolumeSliderBehaviour = 0;
 // volatile uint16_t SleepChangeCnt = 0;
 
 // Константы для парсера
-__flash char CliListS[] = "#CLI.LIST#";
-__flash char CliListE[] = "##CLI.LIST#";
-__flash char CliListInfo[] = "LISTINFO#";
-__flash char AnswerNameSet[] = "NAMESET#: ";
-__flash char AnswerPLAYING[] = "PLAYING#";
-__flash char AnswerMETA[] = "META#: ";
-__flash char AnswerVOL[] = "VOL#: ";
+const char CliListS[] PROGMEM = {"#CLI.LIST#"};
+const char CliListE[] PROGMEM = "##CLI.LIST#";
+const char CliListInfo[] PROGMEM = "LISTINFO#";
+const char AnswerNameSet[] PROGMEM = "NAMESET#: ";
+const char AnswerPLAYING[] PROGMEM = "PLAYING#";
+const char AnswerMETA[] PROGMEM = "META#: ";
+const char AnswerVOL[] PROGMEM = "VOL#: ";
+const char Space21[] PROGMEM ="                     ";
 
 // Код и событие кнопки
 void get_but()
@@ -86,6 +86,11 @@ enum VolSlBeh
 	SliderLinePot,
 	SliderZoomBut
 };
+
+struct EEPROM_Param
+{
+	uint8_t Power : 1;
+} EEPROM_Param;
 
 struct SensorState
 {
@@ -534,22 +539,19 @@ void karadio_parser(char* line)
 
 	if (Flag.GetListCountReading)
 	{
-		//if (((ici = strstr(line, "#CLI.LIST#")) != NULL) && (!Flag.ListCountReadingInProc))
-		if (((ici = strstr(line, pgm_read_byte(&CliListS))) != NULL) && (!Flag.ListCountReadingInProc))
+		if (((ici = strstr_P(line, CliListS)) != NULL) && (!Flag.ListCountReadingInProc))
 		{
 			Flag.ListCountReadingInProc = 1;
 			return;
 		}
 		if (Flag.ListCountReadingInProc)
 		{
-			//if ((ici = strstr(line, "LISTINFO#")) != NULL)
-			if ((ici = strstr(line, pgm_read_byte(&CliListInfo))) != NULL)
+			if ((ici = strstr_P(line, CliListInfo)) != NULL)
 			{
 				ListCount++;
 			}			
 		}
-		//if (((ici = strstr(line, "##CLI.LIST#")) != NULL) && (Flag.ListCountReadingInProc))
-		if (((ici = strstr(line, pgm_read_byte(&CliListE))) != NULL) && (Flag.ListCountReadingInProc))
+		if (((ici = strstr_P(line, CliListE)) != NULL) && (Flag.ListCountReadingInProc))
 		{
 			ListCount -= 1;
 			Flag.GetListCountReading = 0;
@@ -561,20 +563,17 @@ void karadio_parser(char* line)
 
 	if (Flag.ReadingNameSetFromListByIndex)
 	{
-		//if (((ici = strstr(line, "#CLI.LIST#")) != NULL) && (!Flag.ReadingNameSetFromListByIndexProc))
-		if (((ici = strstr(line, pgm_read_byte(&CliListS))) != NULL) && (!Flag.ReadingNameSetFromListByIndexProc))
+		if (((ici = strstr_P(line, CliListS)) != NULL) && (!Flag.ReadingNameSetFromListByIndexProc))
 		{
 			Flag.ReadingNameSetFromListByIndexProc = 1;
 			return;
 		}
-		//if ((ici = strstr(line, "LISTINFO#")) != NULL)
-		if ((ici = strstr(line, pgm_read_byte(&CliListInfo))) != NULL)
+		if ((ici = strstr_P(line, CliListInfo)) != NULL)
 		{
 			strlcpy(NameSet, ici + 16, strchr(ici, ',') - (ici + 15));
 			return;
 		}
-		//if ((ici = strstr(line, "##CLI.LIST#")) != NULL)
-		if ((ici = strstr(line, pgm_read_byte(&CliListE))) != NULL)
+		if ((ici = strstr_P(line, CliListE)) != NULL)
 		{
 			Flag.ReadingNameSetFromListByIndex = 0;
 			Flag.ReadingNameSetFromListByIndexComplete = 1;
@@ -582,9 +581,7 @@ void karadio_parser(char* line)
 			return;
 		}
 	}
-
-	//if ((ici=strstr(line, "NAMESET#: ")) != NULL)
-	if ((ici=strstr(line, pgm_read_byte(&AnswerNameSet))) != NULL)
+	if ((ici=strstr_P(line, AnswerNameSet)) != NULL)
 	{
 		clear_buffer(IntBuff, 4);
 		s = ici + 10;
@@ -595,20 +592,17 @@ void karadio_parser(char* line)
 		strcpy(NameSet, e + 1);
 		Flag.ReadingNameSet = 1;
 	}
-	//if ((ici = strstr(line, "PLAYING#")) != NULL)
-	if ((ici = strstr(line, pgm_read_byte(&AnswerPLAYING))) != NULL)
+	if ((ici = strstr_P(line, AnswerPLAYING)) != NULL)
 	{
 		Flag.RadioIsStarted = 1;
 	}
-	//if ((ici = strstr(line, "META#: ")) != NULL)
-	if ((ici = strstr(line, pgm_read_byte(&AnswerMETA))) != NULL)
+	if ((ici = strstr_P(line, AnswerMETA)) != NULL)
 	{
 		clear_buffer(METAMessage, META_SIZE);
 		strcpy(METAMessage, ici + 7);
 		Flag.METAInfo = 1;
 	}
-	//if ((ici = strstr(line, "VOL#: ")) != NULL)
-	if ((ici = strstr(line, pgm_read_byte(&AnswerVOL))) != NULL)
+	if ((ici = strstr_P(line, AnswerVOL)) != NULL)
 	{
 		if (!Flag.VolumeIsGetting)
 		{
@@ -674,9 +668,17 @@ int main(void)
     {
 		get_but();
 
-		if ( ( ButtonCode == BUT_1_ID ) && ( ButtonEvent == BUT_RELEASED_CODE ) )
+		if ( ( ButtonCode == BUT_1_ID ) && ( ButtonEvent == BUT_DOUBLE_CLICK_CODE ) )
 		{
-			LCD_Clear();
+			if (EEPROM_Param.Power == OFF)
+			{
+				EEPROM_Param.Power = ON;
+			}
+			else
+			{
+				EEPROM_Param.Power = OFF;				
+			}
+			vcc_enable(EEPROM_Param.Power);
 		}
 
 		/* USART1 Rx *****************************************************************************/
@@ -713,8 +715,7 @@ int main(void)
 			for(int i = 0; i < 100; i++) Text[i] = 0; 
 			LCD_Goto(0, StationRow);
 			LCD_Commmand(DATA, 0x00);
-			LCD_Goto(1, StationRow);
-			LCD_Printf("                     ", 0, INV_OFF);
+			LCD_PageClear(StationRow);
 			LCD_Goto(1, StationRow);
 			utf_to_cp1251(Text, NameSet);
 			LCD_Printf(Text, 0, INV_OFF);
@@ -724,19 +725,14 @@ int main(void)
 
 		if (Flag.GetWiFiStatusComplete)
 		{
-			LCD_Goto(1, IPRow);
-			LCD_Printf("                     ", 0, INV_OFF);
-			LCD_Goto(1, IPRow);
-			LCD_Printf(IPString, 0, INV_OFF);
-			Flag.GetWiFiStatusComplete = 0;
+
 		}
 
 		if (Flag.ReadingNameSetFromListByIndexComplete)
 		{
 			LCD_Goto(0, StationRow);
 			LCD_Commmand(DATA, 0xFF);
-			LCD_Goto(1, StationRow);
-			LCD_Printf("                     ", 0, INV_OFF);
+			LCD_PageClear(StationRow);
 			LCD_Goto(1, StationRow);
 			LCD_Printf(NameSet, 0, INV_ON);
 			Flag.ReadingNameSetFromListByIndexComplete = 0;

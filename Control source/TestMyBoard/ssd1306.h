@@ -1,8 +1,5 @@
 /*
  * ssd1306.h
- *
- *  Created on: 29 򦮲. 2016 ᬍ
- *      Author: gavrilov.iv
  */
 
 #ifndef SSD1306_H_

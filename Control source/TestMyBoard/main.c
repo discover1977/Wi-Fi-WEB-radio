@@ -34,12 +34,11 @@
 
 /* == global variables ========================================================== */
 // Buffer for KaRadio exchange
-volatile uint8_t USART1RecieveCompleted = 0;
-volatile uint8_t USART1RxIndex = 0;
+// volatile uint8_t USART1RecieveCompleted = 0;
+// volatile uint8_t USART1RxIndex = 0;
 volatile uint8_t USART1TxIndex = 0;
-volatile uint8_t RxPacketIndex = 0;
 volatile char RxPacket[USART1_RX_BUFFER_SIZE];
-volatile char USART1RxBuffer[USART1_RX_BUFFER_SIZE];
+//volatile char USART1RxBuffer[USART1_RX_BUFFER_SIZE];
 volatile char USART1TxBuffer[USART1_TX_BUFFER_SIZE];
 volatile uint8_t 	ButtonCode = 0;
 volatile uint8_t 	ButtonEvent = 0;
@@ -47,20 +46,17 @@ volatile uint8_t 	ButtonEvent = 0;
 
 char METAMessage[META_SIZE];
 char NameSet[22];
-char IPString[16];
 volatile uint8_t CurrentListIndex;
 volatile uint8_t ListCount;
 volatile uint8_t VolumeLevel;
-volatile uint16_t touch_time_counter = 0u;
+//volatile uint16_t touch_time_counter = 0u;
 volatile uint16_t SetVolumeCnt = 0u;
 volatile uint16_t RefreshCurrentStationCnt = 0;
 uint16_t Buffer[AccSizeMacro(ACC_SIZE)];
 volatile uint16_t METAScrollCnt = 0;
-uint8_t VolumeSliderBehaviour = 0;
-// uint8_t SleepVal[6] = {0, 1, 10, 15, 30, 60};
-// volatile uint16_t SleepChangeCnt = 0;
+// uint8_t VolumeSliderBehaviour = 0;
+volatile uint16_t SleepCnt = 0;
 
-// Константы для парсера
 const char CliListS[] PROGMEM = {"#CLI.LIST#"};
 const char CliListE[] PROGMEM = "##CLI.LIST#";
 const char CliListInfo[] PROGMEM = "LISTINFO#";
@@ -70,7 +66,6 @@ const char AnswerMETA[] PROGMEM = "META#: ";
 const char AnswerVOL[] PROGMEM = "VOL#: ";
 const char Space21[] PROGMEM ="                     ";
 
-// Код и событие кнопки
 void get_but()
 {
 	ButtonCode = BUT_GetBut();
@@ -111,7 +106,7 @@ enum DisplayRow
 
 volatile struct Flag  
 {
-	uint8_t Power : 1;
+	uint8_t Sleep : 1;
 	uint8_t RadioIsStarted : 1;
 	uint8_t METAInfo : 1;
 	uint8_t ScrollStep : 1;
@@ -128,6 +123,7 @@ volatile struct Flag
 	uint8_t RefreshInfo : 1;
 	uint8_t GetWiFiStatus : 1;
 	uint8_t GetWiFiStatusComplete : 1;
+	uint8_t USART1RecieveCompleted : 1;
 } Flag;
 
 enum SensorName
@@ -380,6 +376,7 @@ uint8_t check_val(int val)
 uint8_t set_volume(uint8_t val)
 {
 	char Text[16];
+	static uint8_t VolumeSliderBehaviour = 0;
 	uint8_t changeInSlider = 0;
 	uint8_t slVal = 0;
 	int lVal = val;
@@ -623,6 +620,16 @@ int main(void)
 {
 	int8_t Temp = 0;
 	char Text[100];
+	uint8_t SleepTime = 0;
+	uint16_t SleepVal[6] = {0, 5, 60, 300, 900, 1800};
+
+	/* GPIO ports init */
+	ports_init();
+
+	/* Main board power ON */
+	EEPROM_Param.Power = vcc_enable(ON);
+
+	_delay_ms(100);
 
 	/* Button init */
 	BUT_Init();
@@ -633,9 +640,6 @@ int main(void)
 		LCD_DrawImage(0);
 	#endif
 		
-	/* GPIO ports init */
-	ports_init();	
-
     /* Configure the sys_clock prescaler */
     configure_prescaler(DEF_MCU_CLOCK_PRESCALER);
 
@@ -648,14 +652,11 @@ int main(void)
     /* Initialize QTouch library and configure touch sensors. */
     touch_sensors_init();
 
-	/* Main board power ON */
-	Flag.Power = vcc_enable(ON);
-
 	/* USART1 init */
 	USART1_Init(MYUBRR1);
 	
 	/* Configure the CS8406 */
-	_delay_ms(500);	
+	_delay_ms(10000);	
 	CS8406_Init();
 	LCD_Clear();
 
@@ -668,25 +669,55 @@ int main(void)
     {
 		get_but();
 
-		if ( ( ButtonCode == BUT_1_ID ) && ( ButtonEvent == BUT_DOUBLE_CLICK_CODE ) )
+		if(Flag.Sleep)
+		{
+			Flag.Sleep = 0;			
+			LCD_Clear();
+			LCD_DrawImage(0);
+			EEPROM_Param.Power = vcc_enable(OFF);
+		}
+
+		if ( ( ButtonCode == BUT_1_ID ) && ( ButtonEvent == BUT_RELEASED_CODE ) )
 		{
 			if (EEPROM_Param.Power == OFF)
 			{
-				EEPROM_Param.Power = ON;
+				EEPROM_Param.Power = vcc_enable(ON);
+				LCD_Clear();
+				draw_line(1);
+				draw_line(3);
+				_delay_ms(10000);	
+				Flag.RefreshInfo = 1;
+				SleepTime = 0;
 			}
 			else
 			{
-				EEPROM_Param.Power = OFF;				
-			}
-			vcc_enable(EEPROM_Param.Power);
-		}
+				if(++SleepTime == 6) SleepTime = 0;
+				if (SleepTime > 0)
+				{
+					if (SleepTime == 1)
+					{	
+						sprintf(Text, "Power OFF            ");
+					} 
+					else
+					{
+						sprintf(Text, "Sleep: %3d min.      ", SleepVal[SleepTime] / 60);
+					}
+					show_status_string(Text, INV_ON);
+				} 
+				else
+				{
+					LCD_PageClear(StatusRow);
+				}											
+				SleepCnt = SleepVal[SleepTime];
+			}			
+		}		
 
 		/* USART1 Rx *****************************************************************************/
-		if (USART1RecieveCompleted == 1)
+		if ((Flag.USART1RecieveCompleted == 1) && (EEPROM_Param.Power))
 		{
 			karadio_parser(RxPacket);
 			clear_buffer(RxPacket, USART1_RX_BUFFER_SIZE);
-			USART1RecieveCompleted = 0;		
+			Flag.USART1RecieveCompleted = 0;		
 		}
 		/*****************************************************************************************/
 
@@ -723,11 +754,6 @@ int main(void)
 			Temp = CurrentListIndex;
 		}
 
-		if (Flag.GetWiFiStatusComplete)
-		{
-
-		}
-
 		if (Flag.ReadingNameSetFromListByIndexComplete)
 		{
 			LCD_Goto(0, StationRow);
@@ -750,7 +776,7 @@ int main(void)
 			}
 			/*********************************************************************** META info */
 			/* Scroll **************************************************************************/
-			if(Flag.Scroll)
+			if ((Flag.Scroll) && (EEPROM_Param.Power))
 			{
 				scroll_title_string();
 				Flag.Scroll = 0;
@@ -759,7 +785,7 @@ int main(void)
 		}
 
         touch_sensors_measure();
-		if ((p_selfcap_measure_data->measurement_done_touch == 1u))
+		if ((p_selfcap_measure_data->measurement_done_touch == 1u) && (EEPROM_Param.Power))
 		{
 			SensorState.ButPrev = GET_SELFCAP_SENSOR_STATE(ButPrev);
 			SensorState.ButStop = GET_SELFCAP_SENSOR_STATE(ButStop);
@@ -825,8 +851,10 @@ int main(void)
 /* == Interrupt =================================== */
 ISR(USART1_RX_vect)
 {
+	static uint8_t USART1RxIndex = 0;
 	uint8_t RxData = UDR1;
-	if ((RxData != KARADIO_STOP_BYTE) && (USART1RecieveCompleted == 0))
+	static char USART1RxBuffer[USART1_RX_BUFFER_SIZE];
+	if ((RxData != KARADIO_STOP_BYTE) && (Flag.USART1RecieveCompleted == 0))
 	{
 		USART1RxBuffer[USART1RxIndex] = RxData;
 		if (USART1RxIndex < USART1_RX_BUFFER_SIZE) USART1RxIndex++;
@@ -838,7 +866,7 @@ ISR(USART1_RX_vect)
 			RxPacket[i] = USART1RxBuffer[i];
 		}
 		clear_buffer(USART1RxBuffer, USART1_RX_BUFFER_SIZE);
-		USART1RecieveCompleted = 1;
+		Flag.USART1RecieveCompleted = 1;
 		USART1RxIndex = 0;
 	}
 };
@@ -861,8 +889,19 @@ ISR(TIMER2_COMPA_vect)
     /* Clear the timer flag */
     TIFR2 |= OCF2A;
 	static uint16_t ScrollDevCnt = 0;
+	static uint16_t SecondCnt = 0;
+	static uint16_t touch_time_counter = 0u;
 
 	BUT_Poll();
+
+	if(SleepCnt > 0)
+	{
+		if(++SecondCnt == 1000)
+		{
+			SecondCnt = 0;
+			if(--SleepCnt == 0) Flag.Sleep = 1;
+		}
+	}
 
 	if(RefreshCurrentStationCnt > 0)
 	{

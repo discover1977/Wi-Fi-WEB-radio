@@ -2,7 +2,7 @@
 
 #define NULL         0
 #define STOPPER   0 /* Smaller than any datum */
-#define MEDIAN_FILTER_SIZE 33
+#define MEDIAN_FILTER_SIZE 7
  
 uint16_t MedianFilter(uint16_t datum)
 {

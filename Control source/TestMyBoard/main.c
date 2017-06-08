@@ -4,15 +4,21 @@
 /* == include files ========================================================== */
 //#include <avr/sleep.h>
 #include "touch_api_ptc.h"
-#include "CS8406.h"
 #include "bits_macros.h"
 #include "ssd1306.h"
 #include "median.h"
 #include "buttons.h"
+#include <avr/eeprom.h>
 #include <avr/pgmspace.h>
 #include <util/delay.h>
 #include <stdio.h>
 #include <string.h>
+
+#define CS8406_USE	1
+
+#if CS8406_USE
+	#include "CS8406.h"
+#endif
 
 #define N_ELEMENTS(X) (sizeof(X)/sizeof(*(X)))
 
@@ -21,7 +27,7 @@
 #define OFF		0
 #define DEF_MCU_CLOCK_PRESCALER		0u
 #define DEF_TIME_PERIOD_1MSEC       8u
-#define ACC_SIZE					6
+#define ACC_SIZE					5
 #define AccSizeMacro(val)			( 1 << val )
 #define SET_VOLUME_STOP				3000
 #define USART1_RX_BUFFER_SIZE		128
@@ -34,11 +40,8 @@
 
 /* == global variables ========================================================== */
 // Buffer for KaRadio exchange
-// volatile uint8_t USART1RecieveCompleted = 0;
-// volatile uint8_t USART1RxIndex = 0;
 volatile uint8_t USART1TxIndex = 0;
 volatile char RxPacket[USART1_RX_BUFFER_SIZE];
-//volatile char USART1RxBuffer[USART1_RX_BUFFER_SIZE];
 volatile char USART1TxBuffer[USART1_TX_BUFFER_SIZE];
 volatile uint8_t 	ButtonCode = 0;
 volatile uint8_t 	ButtonEvent = 0;
@@ -49,14 +52,13 @@ char NameSet[22];
 volatile uint8_t CurrentListIndex;
 volatile uint8_t ListCount;
 volatile uint8_t VolumeLevel;
-//volatile uint16_t touch_time_counter = 0u;
 volatile uint16_t SetVolumeCnt = 0u;
 volatile uint16_t RefreshCurrentStationCnt = 0;
 uint16_t Buffer[AccSizeMacro(ACC_SIZE)];
 volatile uint16_t METAScrollCnt = 0;
-// uint8_t VolumeSliderBehaviour = 0;
 volatile uint16_t SleepCnt = 0;
 
+// String constant
 const char CliListS[] PROGMEM = {"#CLI.LIST#"};
 const char CliListE[] PROGMEM = "##CLI.LIST#";
 const char CliListInfo[] PROGMEM = "LISTINFO#";
@@ -65,6 +67,9 @@ const char AnswerPLAYING[] PROGMEM = "PLAYING#";
 const char AnswerMETA[] PROGMEM = "META#: ";
 const char AnswerVOL[] PROGMEM = "VOL#: ";
 const char Space21[] PROGMEM ="                     ";
+const char PowerOffStr[] PROGMEM ="Power OFF            ";
+const char LinPotStr[]  PROGMEM ="  Line potentiometer ";
+const char ButtonsStr[] PROGMEM ="       Buttons       ";
 
 void get_but()
 {
@@ -78,12 +83,12 @@ void get_but()
 enum VolSlBeh
 {	
 	SliderButtons,
-	SliderLinePot,
-	SliderZoomBut
+	SliderLinePot
 };
 
 struct EEPROM_Param
 {
+	uint8_t Init;
 	uint8_t Power : 1;
 } EEPROM_Param;
 
@@ -400,7 +405,8 @@ uint8_t set_volume(uint8_t val)
 			if (SensorState.ButPlay)
 			{
 				LCD_Goto(1, 5);
-				LCD_Printf("  Line potentiometer ", 0, INV_OFF);
+				strcpy_P(Text, LinPotStr);
+				LCD_Printf(Text, 0, INV_OFF);
 				_delay_ms(250);
 				VolumeSliderBehaviour = SliderLinePot;
 				wait_release_sensor();
@@ -408,7 +414,8 @@ uint8_t set_volume(uint8_t val)
 			if (SensorState.ButStop)
 			{				
 				LCD_Goto(1, 5);
-				LCD_Printf("       Buttons       ", 0, INV_OFF);
+				strcpy_P(Text, ButtonsStr);
+				LCD_Printf(Text, 0, INV_OFF);
 				_delay_ms(250);
 				VolumeSliderBehaviour = SliderButtons;
 				wait_release_sensor();
@@ -623,11 +630,19 @@ int main(void)
 	uint8_t SleepTime = 0;
 	uint16_t SleepVal[6] = {0, 5, 60, 300, 900, 1800};
 
+	eeprom_read_block(&EEPROM_Param, 0, sizeof(EEPROM_Param));
+	if (EEPROM_Param.Init == 0xFF)
+	{
+		EEPROM_Param.Init == 0x01;
+		EEPROM_Param.Power = 1;
+		eeprom_update_block(&EEPROM_Param, 0, sizeof(EEPROM_Param));
+	} 
+
 	/* GPIO ports init */
 	ports_init();
 
 	/* Main board power ON */
-	EEPROM_Param.Power = vcc_enable(ON);
+	vcc_enable(EEPROM_Param.Power);
 
 	_delay_ms(100);
 
@@ -656,8 +671,12 @@ int main(void)
 	USART1_Init(MYUBRR1);
 	
 	/* Configure the CS8406 */
-	_delay_ms(10000);	
-	CS8406_Init();
+	_delay_ms(10000);
+		
+	#if CS8406_USE
+		CS8406_Init();
+	#endif
+
 	LCD_Clear();
 
 	send_to_karadio("cli.info");
@@ -675,6 +694,7 @@ int main(void)
 			LCD_Clear();
 			LCD_DrawImage(0);
 			EEPROM_Param.Power = vcc_enable(OFF);
+			eeprom_update_block(&EEPROM_Param, 0, sizeof(EEPROM_Param));
 		}
 
 		if ( ( ButtonCode == BUT_1_ID ) && ( ButtonEvent == BUT_RELEASED_CODE ) )
@@ -686,8 +706,12 @@ int main(void)
 				draw_line(1);
 				draw_line(3);
 				_delay_ms(10000);	
+				#if CS8406_USE
+					CS8406_Init();
+				#endif
 				Flag.RefreshInfo = 1;
 				SleepTime = 0;
+				eeprom_update_block(&EEPROM_Param, 0, sizeof(EEPROM_Param));
 			}
 			else
 			{
@@ -696,7 +720,7 @@ int main(void)
 				{
 					if (SleepTime == 1)
 					{	
-						sprintf(Text, "Power OFF            ");
+						strcpy_P(Text, PowerOffStr);
 					} 
 					else
 					{

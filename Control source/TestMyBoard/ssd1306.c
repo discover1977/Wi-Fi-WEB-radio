@@ -147,8 +147,6 @@ FLASH_VAR(unsigned char image0[]) =
 #endif
 
 FLASH_VAR(unsigned char LCD_Buffer[]) =
-//unsigned char LCD_Buffer[] =
-//__flash const char LCD_Buffer[0x0500] =
 {
 0x00, 0x00, 0x00, 0x00, 0x00,// 00
 0x00, 0x00, 0x5F, 0x00, 0x00,// 01
@@ -645,7 +643,6 @@ void LCD_Char(unsigned int c)
 	TWI_SW_Write(SSD1306_ADDRESS);
 	TWI_SW_Write(DATA);//data mode
 	for (x = 0; x < 5; x++) {
-		//TWI_SW_Write(read_byte_flash(LCD_Buffer[c * 5 + x]));
 		if (LCD_INVERSION)
 		{
 			TWI_SW_Write(~read_byte_flash(LCD_Buffer[c * 5 + x]));
@@ -689,17 +686,17 @@ void LCD_BigNum(unsigned char num)
 	  TWI_SW_Write(read_byte_flash(BigNum[num][x]));
      if(z>=23)
      {
-    	 TWI_SW_Stop();    // stop transmitting
+    	 TWI_SW_Stop();			// stop transmitting
        LCD_Goto(LCD_X,LCD_Y+1);
 
        z=0;
        TWI_SW_Start();
        TWI_SW_Write(SSD1306_ADDRESS);
-       TWI_SW_Write(DATA);//data mode
+       TWI_SW_Write(DATA);		//data mode
      }else{z++;}
 
      }
-  TWI_SW_Stop();    // stop transmitting
+  TWI_SW_Stop();				// stop transmitting
 
 	LCD_X += 23;
     LCD_Goto(LCD_X,y_s);
@@ -722,8 +719,8 @@ void LCD_CharBig(unsigned int c)
 		TWI_SW_Write(m);
 		TWI_SW_Write(m);
 	}
-	TWI_SW_Write(0x00);  	//пробел в одну точку между символами
-	TWI_SW_Stop();    	// stop transmitting
+	TWI_SW_Write(0x00);  				//пробел в одну точку между символами
+	TWI_SW_Stop();    					// stop transmitting
 	LCD_X += 11;
 	if(LCD_X > SSD1306_LCDWIDTH) {
 		LCD_X = SSD1306_DEFAULT_SPACE;
@@ -740,11 +737,11 @@ void LCD_Printf(char* buf, unsigned char size, unsigned char inversion) //выводи
 				LCD_X = SSD1306_DEFAULT_SPACE; }
 			LCD_Char(*buf++);
 		}
-		if(size == 1) {
+		/*if(size == 1) {
 			if((LCD_X > SSD1306_LCDWIDTH) || (LCD_X < 5)) {
 			   LCD_X = SSD1306_DEFAULT_SPACE; }
 			LCD_CharBig(*buf++);
-		}
+		}*/
 		if(size == 2) {
 			if((LCD_X > SSD1306_LCDWIDTH) || (LCD_X < 24)) {
 			   LCD_X = SSD1306_DEFAULT_SPACE; }
@@ -778,28 +775,21 @@ void LCD_DrawImage(unsigned char num_image)
 
 void LCD_Volume(unsigned char val)
 {
-	//uint8_t Step = 0;
 	static uint8_t lastValue = 0;
 	if (val > 127) val = 127;
 
 	if (val > lastValue)
 	{	
-		//Step = val - lastValue;
 		for (int i = lastValue; i < val; i++)
 		{
-			//LCD_Goto(i, 6);
-			//LCD_Commmand(DATA, 0xFF);
 			LCD_Goto(i, 7);
 			LCD_Commmand(DATA, 0xFF);
 		}
 	} 
 	if (val < lastValue)
 	{
-		//Step = lastValue - val;
 		for (int i = lastValue; i > val; i--)
 		{
-			//LCD_Goto(i, 6);
-			//LCD_Commmand(DATA, 0x00);
 			LCD_Goto(i, 7);
 			LCD_Commmand(DATA, 0x00);
 		}

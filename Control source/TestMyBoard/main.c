@@ -49,6 +49,7 @@ volatile uint8_t 	ButtonEvent = 0;
 
 char METAMessage[META_SIZE];
 char NameSet[22];
+char DateString[9];
 volatile uint8_t CurrentListIndex;
 volatile uint8_t ListCount;
 volatile uint8_t VolumeLevel;
@@ -59,7 +60,7 @@ volatile uint16_t METAScrollCnt = 0;
 volatile uint16_t SleepCnt = 0;
 
 // String constant
-const char CliListS[] PROGMEM = {"#CLI.LIST#"};
+const char CliListS[] PROGMEM = "#CLI.LIST#";
 const char CliListE[] PROGMEM = "##CLI.LIST#";
 const char CliListInfo[] PROGMEM = "LISTINFO#";
 const char AnswerNameSet[] PROGMEM = "NAMESET#: ";
@@ -630,12 +631,12 @@ int main(void)
 	uint8_t SleepTime = 0;
 	uint16_t SleepVal[6] = {0, 5, 60, 300, 900, 1800};
 
-	eeprom_read_block(&EEPROM_Param, 0, sizeof(EEPROM_Param));
+	eeprom_read_block((uint8_t*)&EEPROM_Param, 0, sizeof(EEPROM_Param));
 	if (EEPROM_Param.Init == 0xFF)
 	{
-		EEPROM_Param.Init == 0x01;
-		EEPROM_Param.Power = 1;
-		eeprom_update_block(&EEPROM_Param, 0, sizeof(EEPROM_Param));
+		EEPROM_Param.Init = 0x01;
+		EEPROM_Param.Power = ON;
+		eeprom_update_block((uint8_t*)&EEPROM_Param, 0, sizeof(EEPROM_Param));
 	} 
 
 	/* GPIO ports init */
@@ -672,17 +673,18 @@ int main(void)
 	
 	/* Configure the CS8406 */
 	_delay_ms(10000);
-		
-	#if CS8406_USE
-		CS8406_Init();
-	#endif
 
-	LCD_Clear();
+	if (EEPROM_Param.Power == ON)
+	{
+		#if CS8406_USE
+			CS8406_Init();
+		#endif
+		LCD_Clear();
+		send_to_karadio("cli.info");
+		draw_line(1);
+		draw_line(3);
+	}
 
-	send_to_karadio("cli.info");
-
-	draw_line(1);
-	draw_line(3);
 	Flag.ListCountReading = 0;
     while(1)
     {
@@ -693,15 +695,17 @@ int main(void)
 			Flag.Sleep = 0;			
 			LCD_Clear();
 			LCD_DrawImage(0);
-			EEPROM_Param.Power = vcc_enable(OFF);
-			eeprom_update_block(&EEPROM_Param, 0, sizeof(EEPROM_Param));
+			vcc_enable(OFF);
+			EEPROM_Param.Power = OFF;
+			eeprom_update_block((uint8_t*)&EEPROM_Param, 0, sizeof(EEPROM_Param));
 		}
 
 		if ( ( ButtonCode == BUT_1_ID ) && ( ButtonEvent == BUT_RELEASED_CODE ) )
 		{
 			if (EEPROM_Param.Power == OFF)
 			{
-				EEPROM_Param.Power = vcc_enable(ON);
+				vcc_enable(ON);
+				EEPROM_Param.Power = ON;
 				LCD_Clear();
 				draw_line(1);
 				draw_line(3);
@@ -711,7 +715,7 @@ int main(void)
 				#endif
 				Flag.RefreshInfo = 1;
 				SleepTime = 0;
-				eeprom_update_block(&EEPROM_Param, 0, sizeof(EEPROM_Param));
+				eeprom_update_block((uint8_t*)&EEPROM_Param, 0, sizeof(EEPROM_Param));
 			}
 			else
 			{

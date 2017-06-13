@@ -71,6 +71,8 @@ const char Space21[] PROGMEM ="                     ";
 const char PowerOffStr[] PROGMEM ="Power OFF            ";
 const char LinPotStr[]  PROGMEM ="  Line potentiometer ";
 const char ButtonsStr[] PROGMEM ="       Buttons       ";
+const char SoftResetStr[] PROGMEM ="Soft reset";
+const char KaRadioInitStr[] PROGMEM ="KaRadio init";
 
 void get_but()
 {
@@ -624,6 +626,58 @@ void show_status_string(char* text, uint8_t inv)
 	LCD_Printf(text, 0, inv);
 }
 
+void startup_init()
+{
+	/* GPIO ports init */
+	ports_init();
+
+	/* Main board power ON */
+	vcc_enable(EEPROM_Param.Power);
+
+	_delay_ms(100);
+
+	/* Button init */
+	BUT_Init();
+
+	/* OLED display init */
+	LCD_init();
+	#if IMAGE_INCLUDE
+	LCD_DrawImage(0);
+	#endif
+	
+	/* Configure the sys_clock prescaler */
+	configure_prescaler(DEF_MCU_CLOCK_PRESCALER);
+
+	/* Configure the Timer 2 */
+	timer_init();
+
+	/* Enable global interrupts */
+	cpu_irq_enable();
+
+	/* Initialize QTouch library and configure touch sensors. */
+	touch_sensors_init();
+
+	/* USART1 init */
+	USART1_Init(MYUBRR1);
+	
+	/* Configure the CS8406 */
+	_delay_ms(10000);
+
+	Flag.RadioIsStarted = 0;
+
+	if (EEPROM_Param.Power == ON)
+	{
+		#if CS8406_USE
+		CS8406_Init();
+		#endif
+		LCD_Clear();
+		send_to_karadio("cli.info");
+		draw_line(1);
+		draw_line(3);
+	}
+	Flag.ListCountReading = 0;
+}
+
 int main(void)
 {
 	int8_t Temp = 0;
@@ -639,53 +693,8 @@ int main(void)
 		eeprom_update_block((uint8_t*)&EEPROM_Param, 0, sizeof(EEPROM_Param));
 	} 
 
-	/* GPIO ports init */
-	ports_init();
+	startup_init();
 
-	/* Main board power ON */
-	vcc_enable(EEPROM_Param.Power);
-
-	_delay_ms(100);
-
-	/* Button init */
-	BUT_Init();
-
-	/* OLED display init */
-	LCD_init();
-	#if IMAGE_INCLUDE
-		LCD_DrawImage(0);
-	#endif
-		
-    /* Configure the sys_clock prescaler */
-    configure_prescaler(DEF_MCU_CLOCK_PRESCALER);
-
-    /* Configure the Timer 2 */
-    timer_init();
-
-    /* Enable global interrupts */
-    cpu_irq_enable();
-
-    /* Initialize QTouch library and configure touch sensors. */
-    touch_sensors_init();
-
-	/* USART1 init */
-	USART1_Init(MYUBRR1);
-	
-	/* Configure the CS8406 */
-	_delay_ms(10000);
-
-	if (EEPROM_Param.Power == ON)
-	{
-		#if CS8406_USE
-			CS8406_Init();
-		#endif
-		LCD_Clear();
-		send_to_karadio("cli.info");
-		draw_line(1);
-		draw_line(3);
-	}
-
-	Flag.ListCountReading = 0;
     while(1)
     {
 		get_but();
@@ -698,6 +707,36 @@ int main(void)
 			vcc_enable(OFF);
 			EEPROM_Param.Power = OFF;
 			eeprom_update_block((uint8_t*)&EEPROM_Param, 0, sizeof(EEPROM_Param));
+		}
+
+		if ( ( ButtonCode == BUT_1_ID ) && ( ButtonEvent == BUT_DOUBLE_CLICK_CODE ) )
+		{
+			LCD_PageClear(StatusRow);
+
+			strcpy_P(Text, KaRadioInitStr);
+			show_status_string(Text, INV_ON);
+
+			USART1_Init(F_CPU/16/(115200-1));
+
+			send_to_karadio("sys.i2s(\"1\")");
+			_delay_ms(100);
+			send_to_karadio("sys.i2s(\"9600\")");
+			_delay_ms(100);
+
+			ButtonCode = BUT_1_ID;
+			ButtonEvent = BUT_RELEASED_LONG_CODE;
+		}
+
+		if ( ( ButtonCode == BUT_1_ID ) && ( ButtonEvent == BUT_RELEASED_LONG_CODE ) )
+		{			
+			LCD_PageClear(StatusRow);
+
+			strcpy_P(Text, SoftResetStr);
+			show_status_string(Text, INV_ON);
+
+			send_to_karadio("sys.boot");
+			_delay_ms(100);
+			startup_init();
 		}
 
 		if ( ( ButtonCode == BUT_1_ID ) && ( ButtonEvent == BUT_RELEASED_CODE ) )

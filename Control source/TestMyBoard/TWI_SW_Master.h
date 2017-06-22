@@ -24,19 +24,19 @@
 	#endif
 
 // Init Bus	
-void TWI_SW_SW_SWInit();
+void TWI_SW_Init();
 // Start Transfer
-void TWI_SW_SW_Start();
+void TWI_SW_Start();
 // Stop Transfer
-void TWI_SW_SW_Stop();
+void TWI_SW_Stop();
 // Write Transfer
-unsigned int TWI_SW_SW_Write(unsigned int a);
+unsigned int TWI_SW_Write(unsigned int a);
 // Read Transfer
-unsigned int TWI_SW_SW_Read(unsigned int ack);
+unsigned int TWI_SW_Read(unsigned int ack);
 
 // Read Byte
-unsigned int TWI_SW_SW_ReadByte(unsigned int nAddress, unsigned int nRegister);
+unsigned int TWI_SW_ReadByte(unsigned int nAddress, unsigned int nRegister);
 // Write Byte
-void TWI_SW_SW_WriteByte(unsigned int nAddress, unsigned int nRegister, unsigned int nValue);
+void TWI_SW_WriteByte(unsigned int nAddress, unsigned int nRegister, unsigned int nValue);
 
 #endif

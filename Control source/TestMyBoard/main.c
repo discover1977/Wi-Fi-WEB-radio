@@ -41,8 +41,8 @@
 /* == global variables ========================================================== */
 // Buffer for KaRadio exchange
 volatile uint8_t USART1TxIndex = 0;
-volatile char RxPacket[USART1_RX_BUFFER_SIZE];
-volatile char USART1TxBuffer[USART1_TX_BUFFER_SIZE];
+char RxPacket[USART1_RX_BUFFER_SIZE];
+char USART1TxBuffer[USART1_TX_BUFFER_SIZE];
 volatile uint8_t 	ButtonCode = 0;
 volatile uint8_t 	ButtonEvent = 0;
 /****************************************************/
@@ -69,8 +69,8 @@ const char AnswerMETA[] PROGMEM = "META#: ";
 const char AnswerVOL[] PROGMEM = "VOL#: ";
 const char Space21[] PROGMEM ="                     ";
 const char PowerOffStr[] PROGMEM ="Power OFF            ";
-const char LinPotStr[]  PROGMEM ="  Line potentiometer ";
-const char ButtonsStr[] PROGMEM ="       Buttons       ";
+//const char LinPotStr[]  PROGMEM ="  Line potentiometer ";
+//const char ButtonsStr[] PROGMEM ="       Buttons       ";
 const char SoftResetStr[] PROGMEM ="Soft reset";
 const char KaRadioInitStr[] PROGMEM ="KaRadio init";
 
@@ -93,6 +93,7 @@ struct EEPROM_Param
 {
 	uint8_t Init;
 	uint8_t Power : 1;
+	uint8_t VolumeSliderBehaviour;
 } EEPROM_Param;
 
 struct SensorState
@@ -348,7 +349,7 @@ void wait_release_sensor()
 			SensorState.ButNext = GET_SELFCAP_SENSOR_STATE(ButNext);
 			SensorState.Slider = GET_SELFCAP_SENSOR_STATE(Slider);
 
-			GET_SELFCAP_ROTOR_SLIDER_POSITION(0);
+			// GET_SELFCAP_ROTOR_SLIDER_POSITION(0);
 
 			if (!SensorState.ButPrev && 
 				!SensorState.ButStop &&
@@ -381,16 +382,23 @@ uint8_t check_val(int val)
 	else return (uint8_t)val;
 }
 
+void show_slider_behaviour(uint8_t behaviour)
+{
+	LCD_Goto(1, 5);
+	if(behaviour == SliderLinePot) LCD_Printf("    Potentiometer    ", 0, INV_OFF);
+	if(behaviour == SliderButtons) LCD_Printf("       Buttons       ", 0, INV_OFF);
+}
+
 uint8_t set_volume(uint8_t val)
 {
-	char Text[16];
-	static uint8_t VolumeSliderBehaviour = 0;
+	char Text[16];	
 	uint8_t changeInSlider = 0;
 	uint8_t slVal = 0;
 	int lVal = val;
 	LCD_Clear();
 	show_volume(0, 1);
 	show_volume(val, 1);
+	show_slider_behaviour(EEPROM_Param.VolumeSliderBehaviour);
 
 	wait_release_sensor();
 	
@@ -407,21 +415,15 @@ uint8_t set_volume(uint8_t val)
 
 			if (SensorState.ButPlay)
 			{
-				LCD_Goto(1, 5);
-				strcpy_P(Text, LinPotStr);
-				LCD_Printf(Text, 0, INV_OFF);
-				_delay_ms(250);
-				VolumeSliderBehaviour = SliderLinePot;
 				wait_release_sensor();
+				show_slider_behaviour(SliderLinePot);
+				EEPROM_Param.VolumeSliderBehaviour = SliderLinePot;			
 			}
 			if (SensorState.ButStop)
-			{				
-				LCD_Goto(1, 5);
-				strcpy_P(Text, ButtonsStr);
-				LCD_Printf(Text, 0, INV_OFF);
-				_delay_ms(250);
-				VolumeSliderBehaviour = SliderButtons;
-				wait_release_sensor();
+			{		
+				wait_release_sensor();		
+				show_slider_behaviour(SliderButtons);
+				EEPROM_Param.VolumeSliderBehaviour = SliderButtons;
 			}
 
 			if (SensorState.ButPrev)
@@ -437,7 +439,6 @@ uint8_t set_volume(uint8_t val)
 				SetVolumeCnt = 0;
 				val = check_val(++lVal);
 				changeInSlider = 1;
-				//show_volume(val, 1);
 			}
 		}
 	
@@ -447,7 +448,7 @@ uint8_t set_volume(uint8_t val)
 			// slVal = GET_SELFCAP_ROTOR_SLIDER_POSITION(0);
 			// slVal = MedianFilter(GET_SELFCAP_ROTOR_SLIDER_POSITION(0));
 			// slVal = float_window(MedianFilter(GET_SELFCAP_ROTOR_SLIDER_POSITION(0)));
-			if (VolumeSliderBehaviour == SliderButtons)
+			if (EEPROM_Param.VolumeSliderBehaviour == SliderButtons)
 			{
 				slVal = GET_SELFCAP_ROTOR_SLIDER_POSITION(0);
 				if (slVal < 60)
@@ -465,7 +466,7 @@ uint8_t set_volume(uint8_t val)
 				changeInSlider = 1;	
 			}
 			#define DELTA		5
-			if (VolumeSliderBehaviour == SliderLinePot)
+			if (EEPROM_Param.VolumeSliderBehaviour == SliderLinePot)
 			{
 				slVal = float_window(MedianFilter(GET_SELFCAP_ROTOR_SLIDER_POSITION(0)));
 				if ((slVal < (lVal - DELTA)) || (slVal > (lVal + DELTA)))
@@ -481,7 +482,7 @@ uint8_t set_volume(uint8_t val)
 			show_volume(val, 1);
 		}
 
-		if (changeInSlider == 1)
+		if ((changeInSlider == 1) && (USART1TxIndex == 0))
 		{
 			show_volume(val, 1);
 			sprintf(Text, "cli.vol(\"%d\")", val);
@@ -490,13 +491,14 @@ uint8_t set_volume(uint8_t val)
 		}
 	}
 	SetVolumeCnt = 0;
+	eeprom_update_block((uint8_t*)&EEPROM_Param, 0, sizeof(EEPROM_Param));
 	LCD_Clear();
 	return val;
 }
 
 void send_to_karadio(char* text)
 {
-	clear_buffer(USART1TxBuffer, USART1_TX_BUFFER_SIZE);
+	//clear_buffer(USART1TxBuffer, USART1_TX_BUFFER_SIZE);
 	USART1TxIndex = strlen(text);
 	strcpy((char*)USART1TxBuffer, text);
 	USART1TxBuffer[strlen(text)] = 0x0d;
@@ -542,7 +544,6 @@ void karadio_parser(char* line)
 	char* s;
 	char* e;
 	uint8_t d;
-	static uint8_t WiFiStatusStringCount = 0;
 
 	if (Flag.GetListCountReading)
 	{
@@ -690,6 +691,7 @@ int main(void)
 	{
 		EEPROM_Param.Init = 0x01;
 		EEPROM_Param.Power = ON;
+		EEPROM_Param.VolumeSliderBehaviour = SliderLinePot;
 		eeprom_update_block((uint8_t*)&EEPROM_Param, 0, sizeof(EEPROM_Param));
 	} 
 
@@ -703,7 +705,9 @@ int main(void)
 		{
 			Flag.Sleep = 0;			
 			LCD_Clear();
-			LCD_DrawImage(0);
+			#if IMAGE_INCLUDE
+				LCD_DrawImage(0);
+			#endif
 			vcc_enable(OFF);
 			EEPROM_Param.Power = OFF;
 			eeprom_update_block((uint8_t*)&EEPROM_Param, 0, sizeof(EEPROM_Param));
@@ -863,6 +867,7 @@ int main(void)
 			if (SensorState.Slider)
 			{
 				VolumeLevel = set_volume(VolumeLevel);
+				while(USART1TxIndex);
 				send_to_karadio("cli.info");
 				draw_line(1);
 				draw_line(3);

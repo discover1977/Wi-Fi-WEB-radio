@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+                                             <?xml-stylesheet type='text/xsl' href='Summary.xslt'?><SUMMARY>
+  <DeviceInformation>
+    <DeviceName>ATmega328PB</DeviceName>
+    <DeviceVariant>32</DeviceVariant>
+    <Technology>Self Capacitance</Technology>
+  </DeviceInformation>
+  <SensorInformation TotalSensors="5">
+    <NumberOfButtons>4</NumberOfButtons>
+    <NumberOfWheels>0</NumberOfWheels>
+    <NumberOfSliders>1</NumberOfSliders>
+  </SensorInformation>
+  <ChannelInformation>
+    <TotalChannelsConsumed>7</TotalChannelsConsumed>
+  </ChannelInformation>
+  <ChannelInformationDetailed>
+    <Channel No="0" SeriesResistor="Zero" Prescalar="One" AutoOS="Disable" FilterLevel="16" />
+    <Channel No="1" SeriesResistor="Zero" Prescalar="One" AutoOS="Disable" FilterLevel="16" />
+    <Channel No="2" SeriesResistor="Zero" Prescalar="One" AutoOS="Disable" FilterLevel="16" />
+    <Channel No="3" SeriesResistor="Zero" Prescalar="One" AutoOS="Disable" FilterLevel="16" />
+    <Channel No="4" SeriesResistor="Zero" Prescalar="One" AutoOS="Disable" FilterLevel="16" />
+    <Channel No="5" SeriesResistor="Zero" Prescalar="One" AutoOS="Disable" FilterLevel="16" />
+    <Channel No="6" SeriesResistor="Zero" Prescalar="One" AutoOS="Disable" FilterLevel="16" />
+  </ChannelInformationDetailed>
+  <PinConfiguration>
+    <AvailablePorts>B,C,D,E</AvailablePorts>
+    <TotalPinsUsed>12</TotalPinsUsed>
+    <Sensors>
+      <Sensor Name="Button0" ChannelNumber="1" SensingPair="Y7" PortPin="PE3" />
+      <Sensor Name="Button1" ChannelNumber="2" SensingPair="Y6" PortPin="PE2" />
+      <Sensor Name="Button2" ChannelNumber="3" SensingPair="Y17" PortPin="PE1" />
+      <Sensor Name="Button3" ChannelNumber="4" SensingPair="Y16" PortPin="PE0" />
+      <Sensor Name="Slider0" ChannelNumber="5" SensingPair="Y18" PortPin="PB0" />
+      <Sensor Name="Slider0" ChannelNumber="6" SensingPair="Y19" PortPin="PB1" />
+      <Sensor Name="Slider0" ChannelNumber="7" SensingPair="Y20" PortPin="PB2" />
+    </Sensors>
+    <DebugInterface Enabled="True" Type="Uart">
+      <Port Name="UARTPORT" PortPin="PA0" />
+      <PowerAnalyzer>Disable</PowerAnalyzer>
+    </DebugInterface>
+  </PinConfiguration>
+  <LibraryInformation ToolChainName="GCC">
+    <DefaultLibrary>libatmega328pb_qtouch_gcc.a</DefaultLibrary>
+  </LibraryInformation>
+  <MoistureGrouping IsEnabled="false" />
+  <SensorMoistureGroupDetail IsEnabled="false" />
+  <MemoryInformation>
+    <DataMemory>
+      <TotalDataMemory>2048</TotalDataMemory>
+      <DataMemoryUsed>786</DataMemoryUsed>
+      <DataMemoryFree>1262</DataMemoryFree>
+    </DataMemory>
+    <CodeMemory>
+      <TotalCodeMemory>32768</TotalCodeMemory>
+      <CodeMemoryUsed>15260</CodeMemoryUsed>
+      <CodeMemoryFree>17508</CodeMemoryFree>
+    </CodeMemory>
+  </MemoryInformation>
+  <ComponentID>qtlib.generic.tmx.qt.atmega.device</ComponentID>
+  <OtherOptions>
+    <SensorPostProcessingMode>TOUCH_LIBRARY_DRIVEN</SensorPostProcessingMode>
+    <AutoTuning>NONE</AutoTuning>
+    <FilterLevel>Four</FilterLevel>
+    <AutoOS>Zero</AutoOS>
+    <FrequencyMode>NONE</FrequencyMode>
+    <PreScalar>One</PreScalar>
+    <SeriesResistor>Zero</SeriesResistor>
+    <FrequencyHops>One,Two,Three</FrequencyHops>
+    <FrequencyAutoTuneEnabled>Off</FrequencyAutoTuneEnabled>
+    <FrequencyAutoTuneSignalLimit>10</FrequencyAutoTuneSignalLimit>
+    <FrequencyAutoTuneInCount>12</FrequencyAutoTuneInCount>
+    <NoiseMeasurementStatus>Off</NoiseMeasurementStatus>
+    <NoiseMeasurementSignalStabilityLimit>10</NoiseMeasurementSignalStabilityLimit>
+    <NoiseMeasurementNoiseLimit>12</NoiseMeasurementNoiseLimit>
+    <NoiseMeasurementNoiseBufferCount>Five</NoiseMeasurementNoiseBufferCount>
+    <LockoutStatus>SingleKeyLockout</LockoutStatus>
+    <LockoutCountdown>10</LockoutCountdown>
+    <PTCInterruptprioritylevel>Three</PTCInterruptprioritylevel>
+  </OtherOptions>
+</SUMMARY>

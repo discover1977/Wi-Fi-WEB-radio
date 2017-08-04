@@ -690,8 +690,7 @@ void startup_init()
 		
 	LCD_Clear();		
 	draw_line(1);
-	draw_line(3);
-	// send_to_karadio("cli.info");	
+	draw_line(3);	
 }
 
 int main(void)
@@ -730,18 +729,17 @@ int main(void)
 				else
 				{
 					SleepCnt = SleepVal[SleepTime];
-					sprintf(Text, "Sleep after: %02d.%02d", (SleepCnt / 60), (SleepCnt % 60));
+					sprintf(Text, "Sleep after: %2d.%02d", (SleepCnt / 60), (SleepCnt % 60));
 					show_status_string(Text, ON);
 				}				
 			} 
 			else
 			{
 				Flag.Sleep = 0;
+				SleepTime = 0;
+				//clear_buffer(METAMessage, META_SIZE);
 				vcc_enable(ON);
-				LCD_Clear();
-				draw_line(1);
-				draw_line(3);
-				//startup_init();
+				startup_init();
 			}
 						
 		}
@@ -764,7 +762,7 @@ int main(void)
 		/* Show sleep time */
 		if ((SleepCnt > 0) && (Flag.SecondTick))
 		{
-			sprintf(Text, "Sleep after: %02d.%02d", (SleepCnt / 60), (SleepCnt % 60));
+			sprintf(Text, "Sleep after: %2d.%02d", (SleepCnt / 60), (SleepCnt % 60));
 			show_status_string(Text, OFF);
 		}
 
@@ -775,10 +773,12 @@ int main(void)
 		}
 
 		if (Flag.Sleep)
-		{
+		{	
+			clear_buffer(METAMessage, META_SIZE);		
 			LCD_Clear();
-			LCD_DrawImage(0);
-			vcc_enable(OFF);
+			LCD_DrawImage(0);	
+			_delay_ms(100);
+			vcc_enable(OFF);		
 		}
 
 		if (Flag.ReadingNameSet)
@@ -813,8 +813,9 @@ int main(void)
 			Flag.METAInfo = 0;
 		}
 		/*********************************************************************** META info */
+
 		/* Scroll **************************************************************************/
-		if (Flag.Scroll)
+		if ((Flag.Scroll) && (!Flag.Sleep))
 		{
 			scroll_title_string();
 			Flag.Scroll = 0;

@@ -8,7 +8,6 @@
 #include "ssd1306.h"
 #include "median.h"
 #include "buttons.h"
-//#include <avr/eeprom.h>
 #include <avr/pgmspace.h>
 #include <util/delay.h>
 #include <stdio.h>
@@ -86,12 +85,6 @@ void get_but()
 	}
 }
 
-enum VolSlBeh
-{	
-	SliderButtons,
-	SliderLinePot
-};
-
 struct SensorState
 {
 	uint8_t ButPrev : 1;
@@ -105,7 +98,6 @@ enum DisplayRow
 {	
 	StationRow,
 	TitleRow = 2,
-	IPRow = 6,
 	StatusRow = 7
 };
 
@@ -144,11 +136,11 @@ enum SensorName
  */
 static void timer_init(void);
 
-static int8_t vcc_enable(uint8_t val);
+static void vcc_enable(uint8_t val);
 
 static void ports_init(void);
 
-void send_to_karadio(char* text);
+static void send_to_karadio(char* text);
 
 /* == file-scope (static) functions defines =================================== */
 
@@ -200,10 +192,11 @@ void clear_buffer(char* buffer, uint8_t size)
 uint16_t str2int(char* data)
 {
 	volatile uint16_t val = 0, i = 10000;
+	uint8_t c = 0;
 
-	for ( uint8_t c = 0; c < (5 - strlen(data)); c++ ) i /= 10;
+	for ( c = 0; c < (5 - strlen(data)); c++ ) i /= 10;
 
-	for ( uint8_t c = 0; c < strlen(data); c++ )
+	for ( c = 0; c < strlen(data); c++ )
 	{
 		val += (data[c] - 0x30) * i;
 		i /= 10;
@@ -260,19 +253,16 @@ void utf_to_cp1251(char* dest, char* src)
 	}
 }
 
-static int8_t vcc_enable(uint8_t val)
+void vcc_enable(uint8_t val)
 {
 	if (val == ON)
 	{
 		SetBit(PORTC, 1);
-		return ON;
 	} 
 	if (val == OFF)
 	{
 		ClearBit(PORTC, 1);
-		return OFF;
 	}
-	return -1;
 }
 
 static void ports_init(void)
@@ -280,6 +270,7 @@ static void ports_init(void)
 	/* Vcc_CTRL pin init */
 	SetBit(DDRC, 1);
 	ClearBit(PORTC, 1);
+	SetBit(PORTD, 4);
 }
 
 uint16_t float_window( uint16_t Value )
@@ -349,20 +340,12 @@ uint8_t check_val(int val)
 	else return (uint8_t)val;
 }
 
-void show_slider_behaviour(uint8_t behaviour)
-{
-	LCD_Goto(1, 5);
-	if(behaviour == SliderLinePot) LCD_Printf("    Potentiometer    ", 0, INV_OFF);
-	if(behaviour == SliderButtons) LCD_Printf("       Buttons       ", 0, INV_OFF);
-}
-
 uint8_t set_volume(uint8_t val)
 {
 	char Text[16];	
 	uint8_t changeInSlider = 0;
 	uint8_t slVal = 0;
 	int lVal = val;
-	static uint8_t VolumeSliderBehaviour = SliderLinePot;
 	LCD_Clear();
 	show_volume(0, 1);
 	show_volume(val, 1);
@@ -380,31 +363,20 @@ uint8_t set_volume(uint8_t val)
 			SensorState.ButPlay = GET_SELFCAP_SENSOR_STATE(ButPlay);
 			SensorState.Slider = GET_SELFCAP_SENSOR_STATE(Slider);
 
-			if (SensorState.ButPlay)
-			{
-				wait_release_sensor();
-				show_slider_behaviour(SliderLinePot);
-				VolumeSliderBehaviour = SliderLinePot;			
-			}
-			if (SensorState.ButStop)
-			{		
-				wait_release_sensor();		
-				show_slider_behaviour(SliderButtons);
-				VolumeSliderBehaviour = SliderButtons;
-			}
-
 			if (SensorState.ButPrev)
 			{
 				wait_release_sensor();
 				SetVolumeCnt = 0;
-				val = check_val(--lVal);
+				lVal -= 5;
+				val = check_val(lVal);
 				changeInSlider = 1;
 			}
 			if (SensorState.ButNext)
 			{
 				wait_release_sensor();
 				SetVolumeCnt = 0;
-				val = check_val(++lVal);
+				lVal += 5;
+				val = check_val(lVal);
 				changeInSlider = 1;
 			}
 		}
@@ -412,34 +384,14 @@ uint8_t set_volume(uint8_t val)
 		if (SensorState.Slider)
 		{
 			SetVolumeCnt = 0;
-			if (VolumeSliderBehaviour == SliderButtons)
+			#define DELTA		2
+			slVal = float_window(MedianFilter(GET_SELFCAP_ROTOR_SLIDER_POSITION(0)));
+			if ((slVal < (lVal - DELTA)) || (slVal > (lVal + DELTA)))
 			{
-				slVal = GET_SELFCAP_ROTOR_SLIDER_POSITION(0);
-				if (slVal < 60)
-				{
-					lVal -= 5;
-					val = lVal = check_val(lVal);
-					wait_release_sensor();
-				}
-				if (slVal > 195)
-				{
-					lVal += 5;
-					val = lVal = check_val(lVal);
-					wait_release_sensor();
-				}
-				changeInSlider = 1;	
-			}
-			#define DELTA		5
-			if (VolumeSliderBehaviour == SliderLinePot)
-			{
-				slVal = float_window(MedianFilter(GET_SELFCAP_ROTOR_SLIDER_POSITION(0)));
-				if ((slVal < (lVal - DELTA)) || (slVal > (lVal + DELTA)))
-				{
-					val = lVal = slVal;
-					changeInSlider = 1;	
-					show_volume(val, 0);
-				}				
-			}								
+				val = lVal = slVal;
+				changeInSlider = 1;
+				show_volume(val, 0);
+			}										
 		}
 		else if (changeInSlider == 1)
 		{
@@ -561,26 +513,11 @@ void karadio_parser(char* line)
 	}
 }
 
-void show_status_string(char* text, uint8_t inv)
+void show_string(char* text, uint8_t page, uint8_t inv)
 {
-	LCD_Goto(1, StatusRow);
+	LCD_Goto(1, page);
 	LCD_Printf(text, 0, inv);
 }
-
-#if DEBUG
-void wait_push_button()
-{	
-	uint8_t Wait = 1;
-	while(Wait) {
-		get_but();
-		_delay_ms(5);
-		if ((ButtonCode == BUT_1_ID) && (ButtonEvent == BUT_DOUBLE_CLICK_CODE))
-		{
-			Wait = 0;
-		}
-	}
-}
-#endif
 
 void show_KaRadio_version()
 {
@@ -598,7 +535,7 @@ void show_KaRadio_version()
 		/*****************************************************************************************/
 	}
 	LCD_PageClear(StatusRow);
-	show_status_string(FWVersionStr, OFF);
+	show_string(FWVersionStr, StatusRow, OFF);
 }
 
 void startup_init()
@@ -625,28 +562,42 @@ void startup_init()
 	/* Button init */
 	BUT_Init();
 
-#if DEBUG
-	wait_push_button();
-#endif
 	/* Configure the CS8406 */
 	#if CS8406_USE
 	CS8406_Init();
 	#endif
 
-#if DEBUG
-	wait_push_button();
-#endif
 	/* OLED display init */
 	LCD_init();
 	#if IMAGE_INCLUDE
 	LCD_DrawImage(0);
 	#endif
 
+	/* Enable global interrupts */
+	cpu_irq_enable();
+
+	if (BitIsClear(PIND, 4))
+	{
+
+		#define UBRR115200				F_CPU/16/115200-1
+		while(BitIsClear(PIND, 4));
+		show_string("Init", StatusRow, ON);
+		USART1_Init(UBRR115200);
+		_delay_ms(100);
+		send_to_karadio("sys.i2s(\"1\")");
+		_delay_ms(100);
+		send_to_karadio("sys.vol(\"127\")");
+		_delay_ms(100);
+		send_to_karadio("sys.uart(\"9600\")");
+		_delay_ms(100);
+		send_to_karadio("sys.boot");
+	}
+
 	_delay_ms(3000);
-	show_status_string("---------------------", OFF);
+	LCD_PageClear(StatusRow);
 	LCD_Clear();
 
-	show_status_string("KaRadio is loading...", OFF);
+	show_string("KaRadio is loading...", StatusRow, OFF);
 
 	Flag.RadioIsStarted = 0;
 
@@ -654,7 +605,7 @@ void startup_init()
 	USART1_Init(MYUBRR1);
 
 	/* Enable global interrupts */
-	cpu_irq_enable();
+	// cpu_irq_enable();
 		
 	while(!Flag.RadioIsStarted)
 	{
@@ -672,7 +623,7 @@ void startup_init()
 	_delay_ms(2000);
 	LCD_PageClear(StatusRow);
 
-	show_status_string("Reading list count...", OFF);
+	show_string("Reading list count...", StatusRow, OFF);
 	ListCount = 0;
 	Flag.ReadingListComplete = 0;
 	send_to_karadio("cli.list");
@@ -730,7 +681,7 @@ int main(void)
 				{
 					SleepCnt = SleepVal[SleepTime];
 					sprintf(Text, "Sleep after: %2d.%02d", (SleepCnt / 60), (SleepCnt % 60));
-					show_status_string(Text, ON);
+					show_string(Text, StatusRow, ON);
 				}				
 			} 
 			else
@@ -753,7 +704,7 @@ int main(void)
 		/* Update KaRadio FW */
 		if((ButtonCode == BUT_1_ID) && (ButtonEvent == BUT_RELEASED_LONG_CODE))
 		{
-			show_status_string("  Update KaRadio FW  ", ON);
+			show_string("  Update KaRadio FW  ", StatusRow, ON);
 			send_to_karadio("sys.update");
 			Flag.RadioIsStarted = 0;
 			startup_init();
@@ -763,7 +714,7 @@ int main(void)
 		if ((SleepCnt > 0) && (Flag.SecondTick))
 		{
 			sprintf(Text, "Sleep after: %2d.%02d", (SleepCnt / 60), (SleepCnt % 60));
-			show_status_string(Text, OFF);
+			show_string(Text, StatusRow, OFF);
 		}
 
 		if (Flag.RefreshInfo)
@@ -847,7 +798,7 @@ int main(void)
 					Temp = ListCount - 1;
 				}
 				sprintf(Text, "List index: %3d/%d ", Temp + 1, ListCount);
-				show_status_string(Text, INV_OFF);
+				show_string(Text, StatusRow, INV_OFF);
 				Flag.ReadingListComplete = 0;
 				_delay_ms(10);
 				sprintf(Text, "cli.list(\"%d\")\n", Temp);
@@ -876,7 +827,7 @@ int main(void)
 					Temp = 0;
 				}				
 				sprintf(Text, "List index: %3d/%d ", Temp + 1, ListCount);
-				show_status_string(Text, INV_OFF);			
+				show_string(Text, StatusRow, INV_OFF);			
 				Flag.ReadingListComplete = 0;
 				_delay_ms(10);
 				sprintf(Text, "cli.list(\"%d\")\n", Temp);

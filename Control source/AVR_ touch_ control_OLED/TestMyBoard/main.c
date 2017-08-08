@@ -688,7 +688,6 @@ int main(void)
 			{
 				Flag.Sleep = 0;
 				SleepTime = 0;
-				//clear_buffer(METAMessage, META_SIZE);
 				vcc_enable(ON);
 				startup_init();
 			}

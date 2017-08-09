@@ -131,7 +131,7 @@
  * Range: FILTER_LEVEL_1 (one sample) to FILTER_LEVEL_64 ( 64 samples).
  */
 
-#define FL_BUTTON	FILTER_LEVEL_1
+#define FL_BUTTON	FILTER_LEVEL_2
 #define FL_SLIDER	FILTER_LEVEL_8 
 
 #define DEF_SELFCAP_FILTER_LEVEL_PER_NODE FL_BUTTON, FL_BUTTON, FL_BUTTON, FL_BUTTON, FL_SLIDER, FL_SLIDER, FL_SLIDER
@@ -179,7 +179,7 @@
  * Refer gain_t in touch_api_ptc.h
  * Range:GAIN_1 (no scaling) to GAIN_32 (scale-up by 32)
  */
-#define DEF_SELFCAP_GAIN_PER_NODE  GAIN_1, GAIN_1, GAIN_1, GAIN_1, GAIN_1, GAIN_1, GAIN_1
+#define DEF_SELFCAP_GAIN_PER_NODE  GAIN_2, GAIN_2, GAIN_2, GAIN_2, GAIN_2, GAIN_2, GAIN_2
 
 /*----------------------------------------------------------------------------
  *   Tuning for Noise performance, touch response time and Power consumption.

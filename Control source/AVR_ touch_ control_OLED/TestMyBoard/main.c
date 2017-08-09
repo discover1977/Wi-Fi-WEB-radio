@@ -236,7 +236,7 @@ void utf_to_cp1251(char* dest, char* src)
 			}
 			else
 			{
-				if (UTFCharCode == 0xD001)
+				if (UTFCharCode == 0xD081)
 				{
 					*pDest = 0xA8; //  0xA1 - iso8859-5
 					pSrc +=2;
@@ -492,16 +492,19 @@ void karadio_parser(char* line)
 		strcpy(NameSet, e + 1);
 		Flag.ReadingNameSet = 1;
 	}
+
 	if ((ici = strstr_P(line, AnswerPLAYING)) != NULL)
 	{
 		Flag.RadioIsStarted = 1;
 	}
+
 	if ((ici = strstr_P(line, AnswerMETA)) != NULL)
 	{
 		clear_buffer(METAMessage, META_SIZE);
 		strcpy(METAMessage, ici + 7);
 		Flag.METAInfo = 1;
 	}
+
 	if ((ici = strstr_P(line, AnswerVOL)) != NULL)
 	{
 		if (!Flag.VolumeIsGetting)
@@ -540,24 +543,21 @@ void show_KaRadio_version()
 
 void startup_init()
 {
-
 	Flag.Sleep = 0;
 	/* Configure the sys_clock prescaler */
 	//configure_prescaler(DEF_MCU_CLOCK_PRESCALER);
 
-	/* Configure the Timer 2 */
-	timer_init();
-
-	/* Initialize QTouch library and configure touch sensors. */
-	touch_sensors_init();
-
 	/* GPIO ports init */
 	ports_init();
 
+	/* USART1 init */
+	USART1_Init(MYUBRR1);
+
+	/* Enable global interrupts */
+	cpu_irq_enable();
+
 	/* Main board power ON */
 	vcc_enable(ON);
-
-	_delay_ms(100);
 
 	/* Button init */
 	BUT_Init();
@@ -569,12 +569,16 @@ void startup_init()
 
 	/* OLED display init */
 	LCD_init();
+
 	#if IMAGE_INCLUDE
 	LCD_DrawImage(0);
 	#endif
 
-	/* Enable global interrupts */
-	cpu_irq_enable();
+	/* Configure the Timer 2 */
+	timer_init();
+
+	/* Initialize QTouch library and configure touch sensors. */
+	touch_sensors_init();
 
 	if (BitIsClear(PIND, 4))
 	{
@@ -600,12 +604,6 @@ void startup_init()
 	show_string("KaRadio is loading...", StatusRow, OFF);
 
 	Flag.RadioIsStarted = 0;
-
-	/* USART1 init */
-	USART1_Init(MYUBRR1);
-
-	/* Enable global interrupts */
-	// cpu_irq_enable();
 		
 	while(!Flag.RadioIsStarted)
 	{
@@ -638,7 +636,7 @@ void startup_init()
 		}
 		/*****************************************************************************************/
 	}
-		
+	
 	LCD_Clear();		
 	draw_line(1);
 	draw_line(3);	
@@ -652,6 +650,7 @@ int main(void)
 	uint16_t SleepVal[6] = {0, 5, 60, 300, 900, 1800};
 
 	startup_init();
+	Flag.ReadingListComplete = 0;
 
     while(1)
     {
@@ -732,12 +731,10 @@ int main(void)
 		}
 
 		if (Flag.ReadingNameSet)
-		{
-			for(int i = 0; i < 100; i++) Text[i] = 0; 
-			LCD_Goto(0, StationRow);
-			LCD_Commmand(DATA, 0x00);
+		{		
 			LCD_PageClear(StationRow);
 			LCD_Goto(1, StationRow);
+			clear_buffer(Text, 100);
 			utf_to_cp1251(Text, NameSet);
 			LCD_Printf(Text, 0, INV_OFF);
 			Flag.ReadingNameSet = 0;
@@ -746,11 +743,13 @@ int main(void)
 
 		if (Flag.ReadingListComplete)
 		{
+			LCD_PageClear(StationRow);
 			LCD_Goto(0, StationRow);
 			LCD_Commmand(DATA, 0xFF);
-			LCD_PageClear(StationRow);
 			LCD_Goto(1, StationRow);
-			LCD_Printf(NameSet, 0, INV_ON);
+			clear_buffer(Text, 100);
+			utf_to_cp1251(Text, NameSet);
+			LCD_Printf(Text, 0, INV_ON);
 			Flag.ReadingListComplete = 0;
 		}
 

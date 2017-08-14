@@ -28,7 +28,7 @@
 #define DEF_MCU_CLOCK_PRESCALER		0u
 #define DEF_TIME_PERIOD_1MSEC       32u
 #define DEF_TIME_PERIOD_10MSEC		0x1AFF
-#define ACC_SIZE					4
+#define ACC_SIZE					5
 #define AccSizeMacro(val)			( 1 << val )
 #define SET_VOLUME_STOP				600
 #define USART1_RX_BUFFER_SIZE		128
@@ -559,13 +559,14 @@ void startup_init()
 	/* Main board power ON */
 	vcc_enable(ON);
 
-	/* Button init */
-	BUT_Init();
-
+	_delay_ms(50);
 	/* Configure the CS8406 */
 	#if CS8406_USE
 	CS8406_Init();
 	#endif
+
+	/* Button init */
+	BUT_Init();
 
 	/* OLED display init */
 	LCD_init();

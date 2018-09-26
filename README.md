@@ -8,3 +8,5 @@ Schematic & PCB.
 Main-board - DipTrace source
 
 Control-board - Altium source
+
+Demo video: https://www.youtube.com/watch?v=B_mEd4sBfkA
